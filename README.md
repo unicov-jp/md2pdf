@@ -2,7 +2,10 @@
 
 MarkdownとPDF用プレビューを双方向に同期しながら編集し、PDFとして出力するWebツールです。
 サーバー不要の静的ページ（index.html 1枚）なので、GitHub Pagesでそのまま公開できます。
-入力した内容は外部サーバーへ送信されず、すべてブラウザ内で処理されます。
+入力した内容は外部サーバーへ送信されず、すべてブラウザ内で処理されます（Google Drive 連携を使う場合は、接続した本人の Google Drive との間でのみ読み書きします）。
+
+> 拡張版（第3版・2026年10月15日）: Google Drive のチームフォルダを正本にするポータル、Update／Rollback／履歴、表のPNG保存、画像の差し替え、日付付きの書き出しを追加しました。
+> 機能・管理者の設定手順（Google Cloud・`md2pdf-config.json`）・メンバーの使い方は [変更点と使い方.md](変更点と使い方.md) を参照してください。
 
 ## 機能
 
@@ -99,3 +102,5 @@ flowchart LR
 - highlight.js：コードの色分け
 - Mermaid：図（必要時のみ読み込み）
 - html2pdf.js：直接ダウンロード時のみ読み込み
+- html2canvas：表のPNG保存時のみ読み込み
+- Google Identity Services／Google Picker：Google Drive に接続したときのみ読み込み

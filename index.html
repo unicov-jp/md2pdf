@@ -62,6 +62,7 @@
 
   /* ---------- layout ---------- */
   main { flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+  main.lib-open { grid-template-columns: 300px 1fr 1fr; }
   .pane { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
   .pane:last-child { border-right: 0; }
   .pane-head {
@@ -94,6 +95,8 @@
 
   @media (max-width: 800px) {
     main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    main.lib-open { grid-template-columns: 1fr; grid-template-rows: auto 1fr 1fr; }
+    .lib { max-height: 40vh; }
     .pane { border-right: 0; border-bottom: 1px solid var(--border); }
     #preview { padding: 16px; min-height: auto; }
     .toolbar h1 { width: 100%; }
@@ -175,6 +178,96 @@
   .pdf-export { background: #ffffff; color: #111111; }
   .pdf-export .page-break { border: 0; margin: 0; }
 
+  /* ---------- 追加分: 左のファイル一覧（ポータル。Google Drive が正本） ---------- */
+  .lib { background: var(--panel); }
+  .lib[hidden] { display: none; }
+  .lib-head { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .lib-head .lib-title { font-weight: 700; color: var(--text); flex: 1; }
+  .lib-head button, .lib-sub button, .lib-foot button { font-size: 12px; padding: 4px 8px; }
+  .lib-sub { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 6px 12px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .lib-sub .lib-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .lib-sub a { color: var(--accent); text-decoration: none; }
+  .lib-connect { padding: 12px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .lib-connect[hidden] { display: none; }
+  #lib-filter { margin: 6px 12px; padding: 4px 8px; font: inherit; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--editor-bg); color: var(--text); }
+  #lib-list { flex: 1; overflow: auto; list-style: none; margin: 0; padding: 0; min-height: 80px; }
+  #lib-list li { padding: 6px 12px; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 1.4; }
+  #lib-list li:hover { background: rgba(37, 99, 235, .08); }
+  #lib-list li.sel { background: rgba(37, 99, 235, .16); box-shadow: inset 3px 0 0 var(--accent); }
+  #lib-list li .fn { display: block; word-break: break-all; }
+  #lib-list li .meta { color: var(--muted); font-size: 11px; }
+  #lib-list li .meta a { color: var(--accent); text-decoration: none; margin-left: 6px; }
+  #lib-list li.dirty .fn::after { content: ' ●'; color: #d97706; }
+  #lib-list li.empty { color: var(--muted); cursor: default; }
+  .lib-foot { padding: 6px 12px; border-top: 1px solid var(--border); display: flex; gap: 6px; flex-wrap: wrap; }
+  .lib-versions { border-top: 1px solid var(--border); max-height: 32%; display: flex; flex-direction: column; min-height: 0; }
+  #lib-ver-list { overflow: auto; list-style: none; margin: 0; padding: 0; }
+  #lib-ver-list li { display: flex; gap: 8px; align-items: center; padding: 4px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  #lib-ver-list li .vmeta { flex: 1; min-width: 0; }
+  #lib-ver-list li .vsub { color: var(--muted); font-size: 11px; display: block; }
+  #lib-ver-list li button { font-size: 11px; padding: 2px 8px; }
+  #lib-ver-list li.empty { color: var(--muted); }
+  #btn-update.dirty::after { content: ' ●'; }
+
+  /* ---------- 追加分: ダイアログ・浮きボタン・表PNG・画像差し替え ---------- */
+  .preview-wrap { position: relative; }
+  .fab {
+    position: absolute; z-index: 5; font-size: 12px; padding: 3px 8px;
+    border-color: var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+  }
+  .fab[hidden] { display: none; }
+  .dlg {
+    position: fixed; inset: 0; z-index: 100; background: rgba(0, 0, 0, .45);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  .dlg[hidden] { display: none; }
+  .dlg-panel {
+    background: var(--panel); color: var(--text); border-radius: 8px;
+    max-width: 96vw; max-height: 94vh; display: flex; flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .35);
+  }
+  .dlg-panel.narrow { width: 640px; }
+  .dlg-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .dlg-bar label, .dlg-body label { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+  .dlg-bar .spacer, .dlg-body .spacer { flex: 1; }
+  .dlg-body { padding: 12px 14px; overflow: auto; display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+  .dlg-body .row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+  .dlg-body .row.right { justify-content: flex-end; }
+  .dlg-body .row > .lbl { color: var(--muted); font-size: 12px; min-width: 6em; }
+  .dlg-body .muted { color: var(--muted); font-size: 12px; }
+  .dlg input[type="text"] {
+    font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--editor-bg); color: var(--text); width: 24em; max-width: 100%;
+  }
+  .dlg input.wide { width: 100%; flex: 1; }
+  .dlg-hint { font-size: 12px; color: var(--muted); margin: 0; line-height: 1.6; }
+  .dlg-stage { overflow: auto; padding: 14px; background: #e5e7eb; }
+  #tpng-sheet { display: inline-block; }
+  .img-pair { display: flex; gap: 12px; flex-wrap: wrap; }
+  .img-pair figure { margin: 0; flex: 1 1 240px; min-width: 0; text-align: center; }
+  .img-pair img { max-width: 100%; max-height: 240px; border: 1px solid var(--border); background: #fff; }
+  .img-pair figcaption { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  /* 表PNG の見た目（色は固定。記事側の tables_html.py と同じ値） */
+  .np-wrap {
+    display: inline-block; background: #ffffff; color: #1e1e1e; padding: 14px; box-sizing: border-box; max-width: 1200px;
+    font-family: "Noto Sans JP", "Noto Sans CJK JP", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif; line-height: 1.4;
+  }
+  .np-title { color: #1f3a5f; font-weight: 700; font-size: 28px; line-height: 1.3; margin: 0 0 10px; }
+  .np-wrap table { border-collapse: collapse; table-layout: fixed; margin: 0; }
+  .np-wrap th {
+    background: #1f3a5f; color: #ffffff; font-weight: 700; font-size: 25px; line-height: 1.4; padding: 12px 14px;
+    text-align: left; border: 2px solid #ffffff; vertical-align: middle; word-break: break-word; overflow-wrap: anywhere;
+  }
+  .np-wrap td {
+    font-size: 25px; line-height: 1.4; padding: 12px 14px; border: 2px solid #d9dee5; vertical-align: middle;
+    word-break: break-word; overflow-wrap: anywhere; background: #ffffff;
+  }
+  .np-wrap td:first-child { font-weight: 700; background: #eef1f5; }
+  .np-wrap tr:nth-child(even) td:not(:first-child) { background: #f6f8fb; }
+  .np-wrap td.ok { color: #1f7a3f; font-weight: 700; }
+  .np-wrap td.none { color: #6b7280; }
+  .np-note { color: #6b7280; font-size: 20px; line-height: 1.5; margin: 10px 0 0; max-width: 1172px; }
+
   /* ---------- print ---------- */
   @media print {
     html, body { height: auto; background: #ffffff; display: block; }
@@ -194,9 +287,14 @@
 <body>
 <header class="toolbar no-print">
   <h1>Markdown to PDF</h1>
+  <button type="button" id="btn-lib" title="左に Google Drive のファイル一覧を出す／隠す">一覧</button>
   <button type="button" id="btn-new">新規</button>
-  <button type="button" id="btn-open">開く</button>
-  <button type="button" id="btn-save">.md保存</button>
+  <button type="button" id="btn-open" title="このパソコンの .md を取り込む（Drive には入れない。入れるときは「一覧に追加」）">開く</button>
+  <button type="button" id="btn-open-drive" title="一覧のフォルダ以外にある Google Drive の .md を開く">Driveから開く</button>
+  <button type="button" id="btn-update" disabled title="一覧で選んだファイルを Google Drive に上書き保存（前の内容は版として残る）">Update</button>
+  <button type="button" id="btn-rollback" disabled title="1つ前の版に戻す">Rollback</button>
+  <button type="button" id="btn-save" title="Markdown と PDF をファイルに書き出す（ファイル名の末尾に _yyyymmdd）。このパソコンにダウンロード、または Drive に日付付きのコピー">書き出し</button>
+  <button type="button" id="btn-table-png" title="プレビューの表を画像（PNG）にします">表をPNG保存</button>
   <label class="field">用紙
     <select id="page-size">
       <option value="A4" selected>A4</option>
@@ -214,12 +312,38 @@
   </label>
   <span class="spacer"></span>
   <span id="status">準備中...</span>
-  <button type="button" id="btn-download">PDFダウンロード</button>
-  <button type="button" id="btn-print" class="primary">PDF出力（印刷）</button>
+  <button type="button" id="btn-drive-settings" title="Google Drive の接続設定">Drive設定</button>
+  <button type="button" id="btn-print" title="ブラウザの印刷から「PDFに保存」（文字を選択できるPDF）">PDF出力（印刷）</button>
   <input type="file" id="file-input" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
+  <input type="file" id="img-input" accept="image/*" hidden>
 </header>
 
 <main>
+  <aside id="lib" class="pane lib no-print" hidden>
+    <div class="pane-head lib-head">
+      <span class="lib-title">Google Drive</span>
+      <button type="button" id="lib-pick" title="チームのフォルダを選ぶ">フォルダ</button>
+      <button type="button" id="lib-reload" title="一覧を読み直す（他の人の更新を取り込む）">再読込</button>
+    </div>
+    <div class="lib-sub">
+      <span id="lib-name" class="lib-name">（フォルダ未選択）</span>
+      <a id="lib-folder-link" href="#" target="_blank" rel="noopener" hidden>Driveで開く</a>
+      <button type="button" id="lib-add-drive" hidden title="Drive のファイルを選んで一覧に加える（drive.file の権限のとき）">ファイルを追加</button>
+    </div>
+    <div id="lib-connect" class="lib-connect" hidden>
+      <span id="lib-connect-msg">Google に接続すると一覧を読み込みます</span>
+      <button type="button" id="lib-connect-btn" class="primary">Google Drive に接続</button>
+    </div>
+    <input type="text" id="lib-filter" placeholder="絞り込み（ファイル名）" spellcheck="false">
+    <ul id="lib-list"><li class="empty">Google Drive に接続してください</li></ul>
+    <div class="lib-foot">
+      <button type="button" id="lib-new" title="いま編集している内容を、新しいファイルとしてチームのフォルダに作る">一覧に追加（新規ファイル）</button>
+    </div>
+    <div class="lib-versions">
+      <div class="pane-head">履歴 <span id="lib-ver-name" class="muted"></span></div>
+      <ul id="lib-ver-list"><li class="empty">ファイルを選ぶと履歴が出ます</li></ul>
+    </div>
+  </aside>
   <section class="pane no-print">
     <div class="pane-head">Markdown（編集可）</div>
     <textarea id="md" spellcheck="false" aria-label="Markdown"></textarea>
@@ -228,9 +352,92 @@
     <div class="pane-head no-print">プレビュー = PDFの見た目（直接編集可。数式・図・目次はMarkdown側で編集）</div>
     <div class="preview-wrap">
       <article id="preview" class="markdown-body" contenteditable="true" aria-label="プレビュー"></article>
+      <button type="button" id="tpng-fab" class="fab no-print" hidden>この表をPNG保存</button>
+      <button type="button" id="img-fab" class="fab no-print" hidden>この画像を差し替え</button>
     </div>
   </section>
 </main>
+
+<!-- 表をPNG保存 -->
+<div id="tpng" class="dlg no-print" hidden>
+  <div class="dlg-panel" role="dialog" aria-label="表をPNG保存">
+    <div class="dlg-bar">
+      <label>表 <select id="tpng-select"></select></label>
+      <label>ファイル名 <input type="text" id="tpng-name" spellcheck="false"></label>
+      <label><input type="radio" name="tpng-dest" value="drive" checked> Google Drive の images フォルダ</label>
+      <label><input type="radio" name="tpng-dest" value="local"> このパソコン</label>
+      <span class="spacer"></span>
+      <button type="button" id="tpng-save" class="primary">PNGを保存</button>
+      <button type="button" id="tpng-save-all">すべての表を保存</button>
+      <button type="button" id="tpng-close">閉じる</button>
+    </div>
+    <p class="dlg-hint" style="padding: 8px 14px 0;">プレビューの表を、記事用の見た目（幅1200px以内）で画像にします。表題は直前の見出し、注記は表の直後の「※」行、ファイル名は表の直後の「画像ファイル：」行から取ります。文字を直すときは、閉じてプレビューの表を書き換えてください。Google Drive に保存するときは「Drive設定」で保存先フォルダを選びます。</p>
+    <div class="dlg-stage"><div id="tpng-sheet"></div></div>
+  </div>
+</div>
+
+<!-- 保存（Markdown と PDF） -->
+<div id="save-dlg" class="dlg no-print" hidden>
+  <div class="dlg-panel narrow" role="dialog" aria-label="保存">
+    <div class="dlg-bar"><strong>書き出し（Markdown と PDF）</strong><span class="spacer"></span><button type="button" id="save-close">閉じる</button></div>
+    <div class="dlg-body">
+      <div class="row"><span class="lbl">ファイル名</span><input type="text" id="save-name" class="wide" spellcheck="false"><span class="muted">（拡張子は不要）</span></div>
+      <div class="row"><span class="lbl">形式</span>
+        <label><input type="checkbox" id="save-md" checked> Markdown（.md）</label>
+        <label><input type="checkbox" id="save-pdf" checked> PDF（.pdf）</label>
+      </div>
+      <div class="row"><span class="lbl">保存先</span>
+        <label><input type="radio" name="save-dest" value="local" checked> このパソコンにダウンロード</label>
+        <label><input type="radio" name="save-dest" value="drive"> Google Drive のフォルダに日付付きのコピー</label>
+        <span class="muted">フォルダ: <span class="drive-folder-name">（未選択）</span></span>
+        <button type="button" class="drive-folder-pick">フォルダを選ぶ</button>
+      </div>
+      <p class="dlg-hint">チームの正本（一覧のファイル）を保存するのは「Update」です。こちらは手元用・提出用の書き出しで、ファイル名の末尾に _yyyymmdd（今日の日付）が付きます（すでに日付が付いていれば今日の日付に置き換え）。PDF は画像ベース（プレビューをそのまま画像にしたもの）。文字を選択できるPDFが必要なときは「PDF出力（印刷）」を使ってください。Google Drive では同じフォルダに同じ名前があれば上書きします。</p>
+      <div class="row right"><button type="button" id="save-go" class="primary">保存</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Google Drive 設定 -->
+<div id="gd-dlg" class="dlg no-print" hidden>
+  <div class="dlg-panel narrow" role="dialog" aria-label="Google Drive 設定">
+    <div class="dlg-bar"><strong>Google Drive 設定</strong><span class="spacer"></span><button type="button" id="gd-close">閉じる</button></div>
+    <div class="dlg-body">
+      <div class="row"><span class="lbl">クライアントID</span><input type="text" id="gd-client" class="wide" spellcheck="false" placeholder="xxxxxxxx.apps.googleusercontent.com"></div>
+      <div class="row"><span class="lbl">APIキー</span><input type="text" id="gd-key" class="wide" spellcheck="false" placeholder="AIza..."></div>
+      <div class="row"><span class="lbl">アプリID</span><input type="text" id="gd-app" class="wide" spellcheck="false" placeholder="Google Cloud のプロジェクト番号（任意）"></div>
+      <div class="row"><span class="lbl">保存先フォルダ</span><span class="drive-folder-name">（未選択）</span><button type="button" class="drive-folder-pick">フォルダを選ぶ</button><button type="button" id="gd-folder-clear">クリア</button></div>
+      <div class="row"><span class="lbl">権限</span>
+        <label><input type="radio" name="gd-scope" value="file"> drive.file（開いた・作ったファイルと選んだフォルダだけ。既存ファイルは「ファイルを追加」で一覧へ）</label>
+        <label><input type="radio" name="gd-scope" value="full"> drive（フォルダの中の全ファイルを一覧に出せる。チームで同じフォルダを使うならこちら。Workspace の内部アプリなら警告なし）</label>
+      </div>
+      <div class="row"><span class="lbl">チーム設定</span><span id="gd-config-state" class="muted">md2pdf-config.json は未読み込み</span><button type="button" id="gd-reset">この端末の設定をクリア</button></div>
+      <div class="row"><span class="lbl">接続</span><span id="gd-state" class="muted">未接続</span><button type="button" id="gd-connect">接続する</button><button type="button" id="gd-signout">接続を解除</button></div>
+      <p class="dlg-hint">Google Cloud Console で「OAuth クライアントID（ウェブ アプリケーション）」を作り、承認済みの JavaScript 生成元にこのページの URL（例: https://unicov-jp.github.io）を登録します。APIキーは Google Picker API 用です。Google Drive API と Google Picker API を有効にしてください。権限は上の「権限」で選びます（チームで同じフォルダを使うなら drive）。index.html と同じ場所に md2pdf-config.json を置くと、チーム全員が同じ設定で始められます（この画面で保存した値が優先）。設定はこのブラウザにだけ保存され、アクセストークンは保存しません。file:// で開いたページでは Google にログインできません。</p>
+      <div class="row right"><button type="button" id="gd-save" class="primary">設定を保存</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- 画像の差し替え -->
+<div id="img-dlg" class="dlg no-print" hidden>
+  <div class="dlg-panel narrow" role="dialog" aria-label="画像を差し替え">
+    <div class="dlg-bar"><strong>画像を差し替え</strong><span class="spacer"></span><button type="button" id="img-close">閉じる</button></div>
+    <div class="dlg-body">
+      <div class="img-pair">
+        <figure><img id="img-cur" alt=""><figcaption id="img-cur-info">今の画像</figcaption></figure>
+        <figure><img id="img-new" alt=""><figcaption id="img-new-info">新しい画像（未選択）</figcaption></figure>
+      </div>
+      <div class="row">
+        <button type="button" id="img-pick-local">このパソコンから選ぶ</button>
+        <button type="button" id="img-pick-drive">Google Driveから選ぶ</button>
+        <label><input type="checkbox" id="img-shrink" checked> 幅が1280pxを超える画像は縮小する（写真向け）</label>
+      </div>
+      <p class="dlg-hint">選んだ画像は Markdown の中に埋め込まれます（data URI）。表の画像は「表をPNG保存」で作った同じ名前のPNGを選んでください。画像の説明（alt）はそのまま残ります。</p>
+      <div class="row right"><button type="button" id="img-apply" class="primary" disabled>差し替える</button></div>
+    </div>
+  </div>
+</div>
 
 <script type="text/plain" id="sample"># サンプル文書
 
@@ -308,6 +515,12 @@ function greet(name) {
 
   var HTML2PDF_URL = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js';
   var MERMAID_URL = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js';
+  var HTML2CANVAS_URL = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+  var GSI_URL = 'https://accounts.google.com/gsi/client';
+  var GAPI_URL = 'https://apis.google.com/js/api.js';
+  var DRIVE_SCOPES = { file: 'https://www.googleapis.com/auth/drive.file', full: 'https://www.googleapis.com/auth/drive' };
+  var TEAM_CONFIG_URL = 'md2pdf-config.json';
+  var DRIVE_CFG_KEY = 'md2pdf:drive:v1';
   var STORAGE_KEY = 'md2pdf:v1';
   var PAGE_SIZES = {
     A4:     { css: 'A4',     jspdf: 'a4',     w: 210,   h: 297 },
@@ -522,6 +735,56 @@ function greet(name) {
     }
   });
 
+  // 表のセル内の改行は <br> として保持する（Markdownの表は1セル1行なので、生の改行が入ると表が壊れる）
+  function inTableCell(node) {
+    for (var p = node.parentNode; p; p = p.parentNode) {
+      if (p.nodeName === 'TD' || p.nodeName === 'TH') return true;
+    }
+    return false;
+  }
+  turndown.addRule('cellLineBreak', {
+    filter: function (node) {
+      return node.nodeName === 'BR' && inTableCell(node);
+    },
+    replacement: function () { return '<br>'; }
+  });
+  turndown.addRule('cellOneLine', {
+    filter: ['th', 'td'],
+    replacement: function (content, node) {
+      var index = Array.prototype.indexOf.call(node.parentNode.childNodes, node);
+      content = content.replace(/^\n+|\n+$/g, '').replace(/[ \t]*\n+[ \t]*/g, '<br>');
+      return (index === 0 ? '| ' : ' ') + content + ' |';
+    }
+  });
+
+  // marked は href/src を encodeURI するので、Markdown に戻すときに日本語などを読める形に戻す
+  // （画像のパス images/xxx_写真01.jpg やリンクが %E5... にならないように）。裸のURL（自動リンク）は [url](url) にしない
+  function readableUrl(u) {
+    if (!u || /^data:/i.test(u)) return u || '';
+    try { return decodeURI(u); } catch (e) { return u; }
+  }
+  turndown.addRule('imageReadable', {
+    filter: 'img',
+    replacement: function (content, node) {
+      var alt = (node.getAttribute('alt') || '').replace(/\n+/g, ' ');
+      var src = readableUrl(node.getAttribute('data-src') || node.getAttribute('src'));
+      var title = (node.getAttribute('title') || '').replace(/\n+/g, ' ');
+      return src ? '![' + alt + '](' + src + (title ? ' "' + title + '"' : '') + ')' : '';
+    }
+  });
+  turndown.addRule('linkReadable', {
+    filter: function (node) {
+      return node.nodeName === 'A' && !!node.getAttribute('href');
+    },
+    replacement: function (content, node) {
+      var raw = node.getAttribute('href');
+      var href = readableUrl(raw);
+      var title = (node.getAttribute('title') || '').replace(/\n+/g, ' ');
+      if (content === href || content === raw) return href;
+      return '[' + content + '](' + href + (title ? ' "' + title + '"' : '') + ')';
+    }
+  });
+
   function mdToHtml(md) {
     return DOMPurify.sanitize(marked.parse(md || ''));
   }
@@ -684,6 +947,7 @@ function greet(name) {
     renderCode(pvEl);
     renderToc(pvEl);
     renderMermaid(pvEl);
+    resolveLibImages(pvEl);
   }
 
   /* ---------- helpers ---------- */
@@ -734,6 +998,15 @@ function greet(name) {
     var name = sanitizeFileName(h1 ? h1.textContent : '');
     return name || 'document';
   }
+
+  // 保存名: 末尾に _yyyymmdd（今日）。すでに付いていれば今日の日付に置き換える
+  function p2(n) { return (n < 10 ? '0' : '') + n; }
+  function todayStamp() {
+    var d = new Date();
+    return d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate());
+  }
+  function stripDateSuffix(name) { return String(name || '').replace(/_\d{8}$/, ''); }
+  function withDateSuffix(name) { return stripDateSuffix(name) + '_' + todayStamp(); }
 
   /* ---------- sync ---------- */
   function syncFromMarkdown() {
@@ -819,14 +1092,21 @@ function greet(name) {
   pageMarginEl.addEventListener('change', function () { applyPageSettings(); storageSet(); });
 
   /* ---------- file operations ---------- */
+  // 文字列を文書として開く（ローカルのファイル・Drive のファイル共通）
+  function openText(text, name) {
+    text = String(text || '').replace(/^\uFEFF/, '');
+    fileBase = sanitizeFileName(String(name || '').replace(/\.(md|markdown|txt)$/i, ''));
+    setContent(text);
+    setStatus('読み込みました: ' + name);
+  }
+
   function readFile(file) {
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function () {
-      var text = String(reader.result || '').replace(/^﻿/, '');
-      fileBase = sanitizeFileName(file.name.replace(/\.(md|markdown|txt)$/i, ''));
-      setContent(text);
-      setStatus('読み込みました: ' + file.name);
+      driveFileId = '';
+      openText(reader.result, file.name);
+      libSelect(null);
     };
     reader.onerror = function () { setStatus('ファイルを読み込めませんでした'); };
     reader.readAsText(file, 'UTF-8');
@@ -841,24 +1121,75 @@ function greet(name) {
     readFile(fileInput.files && fileInput.files[0]);
   });
 
-  function saveMarkdown() {
+  /* ---------- 保存（Markdown と PDF。ファイル名の末尾に _yyyymmdd） ---------- */
+  var saveDlg = document.getElementById('save-dlg');
+  var saveNameEl = document.getElementById('save-name');
+
+  function openSaveDlg() {
     flushAll();
-    var blob = new Blob([mdEl.value], { type: 'text/markdown;charset=utf-8' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = getBaseName() + '.md';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-    setStatus('Markdownを保存しました');
+    saveNameEl.value = withDateSuffix(getBaseName());
+    refreshFolderLabels();
+    saveDlg.hidden = false;
+    saveNameEl.focus();
+    saveNameEl.select();
+  }
+  function closeSaveDlg() { saveDlg.hidden = true; }
+
+  function doSave() {
+    flushAll();
+    var name = sanitizeFileName(saveNameEl.value).replace(/\.(md|pdf)$/i, '') || withDateSuffix(getBaseName());
+    var wantMd = document.getElementById('save-md').checked;
+    var wantPdf = document.getElementById('save-pdf').checked;
+    var dest = (document.querySelector('input[name="save-dest"]:checked') || {}).value || 'local';
+    if (!wantMd && !wantPdf) { setStatus('形式（Markdown／PDF）を選んでください'); return; }
+    var btn = document.getElementById('save-go');
+    btn.disabled = true;
+    setStatus('保存の準備中...');
+    var jobs = [];
+    if (wantMd) {
+      jobs.push({ name: name + '.md', mime: 'text/markdown', make: function () {
+        return Promise.resolve(new Blob([mdEl.value], { type: 'text/markdown;charset=utf-8' }));
+      } });
+    }
+    if (wantPdf) {
+      jobs.push({ name: name + '.pdf', mime: 'application/pdf', make: makePdfBlob });
+    }
+    var prep = dest === 'drive' ? ensureDriveFolder() : Promise.resolve();
+    var saved = [];
+    prep.then(function () {
+      return jobs.reduce(function (p, job) {
+        return p.then(function () {
+          setStatus((job.mime === 'application/pdf' ? 'PDFを生成中...' : 'Markdownを保存中...'));
+          return job.make().then(function (blob) {
+            if (dest === 'drive') {
+              return driveUpload(job.name, blob, job.mime, driveCfg.folderId).then(function (r) { saved.push(job.name + (r && r.updated ? '（上書き）' : '')); });
+            }
+            downloadBlob(blob, job.name);
+            saved.push(job.name);
+          });
+        });
+      }, Promise.resolve());
+    }).then(function () {
+      fileBase = stripDateSuffix(name);
+      storageSet();
+      closeSaveDlg();
+      setStatus((dest === 'drive' ? 'Google Drive に保存しました: ' : '保存しました: ') + saved.join('、'));
+    }).catch(function (e) {
+      setStatus('保存に失敗しました: ' + ((e && e.message) || e));
+    }).then(function () { btn.disabled = false; });
   }
 
-  document.getElementById('btn-save').addEventListener('click', saveMarkdown);
+  document.getElementById('btn-save').addEventListener('click', openSaveDlg);
+  document.getElementById('save-go').addEventListener('click', doSave);
+  document.getElementById('save-close').addEventListener('click', closeSaveDlg);
+  saveDlg.addEventListener('click', function (e) { if (e.target === saveDlg) closeSaveDlg(); });
+  saveNameEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); doSave(); } });
 
   document.getElementById('btn-new').addEventListener('click', function () {
     if (mdEl.value && !confirm('現在の内容を破棄して新規作成しますか？')) return;
     fileBase = '';
+    driveFileId = '';
+    libSelect(null);
     setContent('');
     mdEl.focus();
   });
@@ -891,7 +1222,7 @@ function greet(name) {
   window.addEventListener('beforeprint', function () {
     flushAll();
     applyPageSettings();
-    document.title = getBaseName();
+    document.title = withDateSuffix(getBaseName());
   });
   window.addEventListener('afterprint', function () {
     document.title = originalTitle;
@@ -922,43 +1253,1382 @@ function greet(name) {
     return html2pdfLoading;
   }
 
-  document.getElementById('btn-download').addEventListener('click', function () {
-    flushAll();
-    var btn = this;
+  // プレビューを画像ベースの PDF（Blob）にする（「保存」ダイアログが使う）
+  function makePdfBlob() {
     var size = PAGE_SIZES[pageSizeEl.value] || PAGE_SIZES.A4;
     var m = Number(pageMarginEl.value) || 15;
-    btn.disabled = true;
-    setStatus('PDFを生成中...');
+    return Promise.all([loadHtml2Pdf(), waitForRender()]).then(function () {
+      var clone = document.createElement('div');
+      clone.className = 'markdown-body pdf-export';
+      clone.style.width = (size.w - m * 2) + 'mm';
+      clone.innerHTML = pvEl.innerHTML;
+      return window.html2pdf().set({
+        margin: m,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: size.jspdf, orientation: 'portrait' },
+        pagebreak: {
+          mode: ['css', 'legacy'],
+          after: '.page-break',
+          avoid: ['pre', 'table', 'blockquote', 'img', 'tr', '.math-block', '.mermaid-block', '.markdown-alert']
+        }
+      }).from(clone).outputPdf('blob');
+    });
+  }
 
-    Promise.all([loadHtml2Pdf(), waitForRender()])
-      .then(function () {
-        var clone = document.createElement('div');
-        clone.className = 'markdown-body pdf-export';
-        clone.style.width = (size.w - m * 2) + 'mm';
-        clone.innerHTML = pvEl.innerHTML;
-        return window.html2pdf().set({
-          margin: m,
-          filename: getBaseName() + '.pdf',
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-          jsPDF: { unit: 'mm', format: size.jspdf, orientation: 'portrait' },
-          pagebreak: {
-            mode: ['css', 'legacy'],
-            after: '.page-break',
-            avoid: ['pre', 'table', 'blockquote', 'img', 'tr', '.math-block', '.mermaid-block', '.markdown-alert']
+  /* ---------- 共通: ダウンロード ---------- */
+  function downloadBlob(blob, name) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  /* ---------- Google Drive（OAuth drive.file ＋ Picker） ---------- */
+  var driveCfg = (function () {
+    try { return JSON.parse(localStorage.getItem(DRIVE_CFG_KEY) || '{}') || {}; } catch (e) { return {}; }
+  })();
+  var driveToken = '';
+  var driveTokenExp = 0;
+  var tokenClient = null;
+  var tokenCb = null;
+  var tokenErr = null;
+  var pickerLoading = null;
+  var driveFileId = '';   // Drive から開いた .md の ID
+
+  function saveDriveCfg() {
+    try { localStorage.setItem(DRIVE_CFG_KEY, JSON.stringify(driveCfg)); } catch (e) { /* ignore */ }
+  }
+  function driveReady() { return !!(driveCfg.clientId && driveCfg.apiKey); }
+  function requireDrive() {
+    if (driveReady()) return Promise.resolve();
+    openDriveSettings();
+    return Promise.reject(new Error('Google Drive を使うには「Drive設定」でクライアントIDとAPIキーを入れてください'));
+  }
+  function ensureGsi() {
+    if (window.google && window.google.accounts && window.google.accounts.oauth2) return Promise.resolve();
+    return loadScript(GSI_URL);
+  }
+  // アクセストークンを得る（有効なら使い回す）
+  function getToken(prompt) {
+    if (driveToken && Date.now() < driveTokenExp - 60000) return Promise.resolve(driveToken);
+    return requireDrive().then(ensureGsi).then(function () {
+      return new Promise(function (resolve, reject) {
+        if (!tokenClient) {
+          tokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: driveCfg.clientId,
+            scope: DRIVE_SCOPES[driveCfg.scope === 'full' ? 'full' : 'file'],
+            callback: function (resp) { if (tokenCb) tokenCb(resp); },
+            error_callback: function (err) { if (tokenErr) tokenErr(err); }
+          });
+        }
+        tokenCb = function (resp) {
+          if (!resp || resp.error) {
+            reject(new Error('Google へのログインができませんでした' + (resp && resp.error ? '（' + resp.error + '）' : '')));
+            return;
           }
-        }).from(clone).save();
+          driveToken = resp.access_token;
+          driveTokenExp = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
+          setDriveState();
+          onDriveToken();
+          resolve(driveToken);
+        };
+        tokenErr = function (err) {
+          reject(new Error('Google へのログインが中断されました' + (err && err.type ? '（' + err.type + '）' : '')));
+        };
+        tokenClient.requestAccessToken({ prompt: prompt || '' });
+      });
+    });
+  }
+  function driveSignOut() {
+    if (driveToken && window.google && window.google.accounts && window.google.accounts.oauth2) {
+      try { window.google.accounts.oauth2.revoke(driveToken, function () {}); } catch (e) { /* ignore */ }
+    }
+    driveToken = '';
+    driveTokenExp = 0;
+    setDriveState();
+  }
+  function ensurePicker() {
+    if (window.google && window.google.picker) return Promise.resolve();
+    if (pickerLoading) return pickerLoading;
+    pickerLoading = (window.gapi ? Promise.resolve() : loadScript(GAPI_URL)).then(function () {
+      return new Promise(function (resolve, reject) {
+        window.gapi.load('picker', { callback: resolve, onerror: function () { reject(new Error('Google Picker を読み込めませんでした')); } });
+      });
+    }).catch(function (e) {
+      pickerLoading = null;
+      throw e;
+    });
+    return pickerLoading;
+  }
+  // kind: 'md'（Markdown ファイル）| 'image'（画像）| 'folder'（保存先フォルダ）。選ばなければ null
+  function pickDrive(kind) {
+    return getToken().then(function (token) {
+      return ensurePicker().then(function () { return token; });
+    }).then(function (token) {
+      return new Promise(function (resolve) {
+        var gp = window.google.picker;
+        var view;
+        if (kind === 'folder') {
+          view = new gp.DocsView(gp.ViewId.FOLDERS).setIncludeFolders(true).setSelectFolderEnabled(true).setMimeTypes('application/vnd.google-apps.folder');
+        } else if (kind === 'image') {
+          view = new gp.DocsView(gp.ViewId.DOCS_IMAGES).setIncludeFolders(true);
+          if (driveCfg.folderId && view.setParent) view.setParent(driveCfg.folderId);
+        } else {
+          view = new gp.DocsView(gp.ViewId.DOCS).setIncludeFolders(true);
+        }
+        if (view.setEnableDrives) view.setEnableDrives(true);
+        var b = new gp.PickerBuilder()
+          .addView(view)
+          .setOAuthToken(token)
+          .setDeveloperKey(driveCfg.apiKey)
+          .setLocale('ja')
+          .setTitle(kind === 'folder' ? '保存先のフォルダを選ぶ' : (kind === 'image' ? '画像を選ぶ' : 'Markdown ファイルを選ぶ'))
+          .setCallback(function (data) {
+            if (data.action === gp.Action.PICKED) {
+              var d = data.docs && data.docs[0];
+              resolve(d ? { id: d.id, name: d.name, mimeType: d.mimeType } : null);
+            } else if (data.action === gp.Action.CANCEL) {
+              resolve(null);
+            }
+          });
+        if (driveCfg.appId) b.setAppId(driveCfg.appId);
+        b.build().setVisible(true);
+      });
+    });
+  }
+  function driveFetch(url, opts, retried) {
+    return getToken().then(function (token) {
+      opts = opts || {};
+      var headers = {};
+      var k;
+      for (k in (opts.headers || {})) headers[k] = opts.headers[k];
+      headers.Authorization = 'Bearer ' + token;
+      return fetch(url, { method: opts.method || 'GET', headers: headers, body: opts.body }).then(function (r) {
+        if (r.status === 401 && !retried) {
+          driveToken = '';
+          return driveFetch(url, opts, true);
+        }
+        if (!r.ok) {
+          return r.text().then(function (t) { throw new Error('Google Drive API エラー ' + r.status + ' ' + t.slice(0, 200)); });
+        }
+        return r;
+      });
+    });
+  }
+  function driveDownload(id) {
+    return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?alt=media&supportsAllDrives=true')
+      .then(function (r) { return r.blob(); });
+  }
+  function driveGetMeta(id, fields) {
+    return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent(fields) + '&supportsAllDrives=true')
+      .then(function (r) { return r.json(); });
+  }
+  function driveFindInFolder(name, folderId) {
+    var q = "name = '" + name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "' and trashed = false" + (folderId ? " and '" + folderId + "' in parents" : '');
+    return driveFetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true&pageSize=5')
+      .then(function (r) { return r.json(); })
+      .then(function (j) { return (j.files && j.files[0]) ? j.files[0].id : ''; });
+  }
+  // 同じフォルダに同じ名前があれば上書き、無ければ新規
+  function driveUpload(name, blob, mimeType, folderId) {
+    return driveFindInFolder(name, folderId).then(function (existing) {
+      if (existing) {
+        return driveFetch('https://www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(existing) + '?uploadType=media&supportsAllDrives=true&fields=id,name',
+          { method: 'PATCH', headers: { 'Content-Type': mimeType }, body: blob })
+          .then(function (r) { return r.json(); })
+          .then(function (j) { j.updated = true; return j; });
+      }
+      var meta = { name: name, mimeType: mimeType };
+      if (folderId) meta.parents = [folderId];
+      var boundary = 'md2pdf_' + Date.now();
+      var head = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) +
+        '\r\n--' + boundary + '\r\nContent-Type: ' + mimeType + '\r\n\r\n';
+      var tail = '\r\n--' + boundary + '--';
+      return driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name',
+        { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + boundary }, body: new Blob([head, blob, tail]) })
+        .then(function (r) { return r.json(); });
+    });
+  }
+  // 保存先フォルダ
+  function setDriveFolder(id, name) {
+    driveCfg.folderId = id || '';
+    driveCfg.folderName = name || '';
+    driveCfg.folderLink = '';
+    saveDriveCfg();
+    refreshFolderLabels();
+    if (id) {
+      driveGetMeta(id, 'name,webViewLink').then(function (j) {
+        if (driveCfg.folderId !== id || !j) return;
+        if (j.name) driveCfg.folderName = j.name;
+        if (j.webViewLink) driveCfg.folderLink = j.webViewLink;
+        saveDriveCfg();
+        refreshFolderLabels();
+      }).catch(function () { /* ignore */ });
+    }
+  }
+  function refreshFolderLabels() {
+    var label = driveCfg.folderId ? (driveCfg.folderName || driveCfg.folderId) : '（未選択。マイドライブ直下に保存）';
+    Array.prototype.forEach.call(document.querySelectorAll('.drive-folder-name'), function (el) { el.textContent = label; });
+    var ln = document.getElementById('lib-name');
+    if (ln) ln.textContent = driveCfg.folderId ? ('フォルダ: ' + (driveCfg.folderName || driveCfg.folderId)) : '（フォルダ未選択）';
+    var a = document.getElementById('lib-folder-link');
+    if (a) { a.hidden = !driveCfg.folderLink; if (driveCfg.folderLink) a.href = driveCfg.folderLink; }
+  }
+  function ensureDriveFolder() {
+    if (driveCfg.folderId) return Promise.resolve();
+    return pickDrive('folder').then(function (f) {
+      if (f) setDriveFolder(f.id, f.name);
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.drive-folder-pick'), function (btn) {
+    btn.addEventListener('click', function () {
+      pickDrive('folder').then(function (f) {
+        if (f) { setDriveFolder(f.id, f.name); setStatus('保存先フォルダ: ' + f.name); }
+      }).catch(function (e) { setStatus((e && e.message) || String(e)); });
+    });
+  });
+
+  // Drive 設定ダイアログ
+  var gdDlg = document.getElementById('gd-dlg');
+  function setDriveState() {
+    var el = document.getElementById('gd-state');
+    el.textContent = driveToken ? '接続中（' + Math.max(0, Math.round((driveTokenExp - Date.now()) / 60000)) + '分有効）' : (driveReady() ? '未接続（使うときに自動でログイン）' : '設定が未入力');
+  }
+  function openDriveSettings() {
+    document.getElementById('gd-client').value = driveCfg.clientId || '';
+    document.getElementById('gd-key').value = driveCfg.apiKey || '';
+    document.getElementById('gd-app').value = driveCfg.appId || '';
+    var sc = document.querySelector('input[name="gd-scope"][value="' + (driveCfg.scope === 'full' ? 'full' : 'file') + '"]');
+    if (sc) sc.checked = true;
+    document.getElementById('gd-config-state').textContent = teamCfgLoaded ? 'md2pdf-config.json を読み込み済み（この端末で保存した設定が優先）' : 'md2pdf-config.json は未読み込み（同じ場所に置くとチーム共通の設定になります）';
+    refreshFolderLabels();
+    setDriveState();
+    gdDlg.hidden = false;
+  }
+  function closeDriveSettings() { gdDlg.hidden = true; }
+  document.getElementById('btn-drive-settings').addEventListener('click', openDriveSettings);
+  document.getElementById('gd-close').addEventListener('click', closeDriveSettings);
+  gdDlg.addEventListener('click', function (e) { if (e.target === gdDlg) closeDriveSettings(); });
+  document.getElementById('gd-save').addEventListener('click', function () {
+    var cid = document.getElementById('gd-client').value.trim();
+    var key = document.getElementById('gd-key').value.trim();
+    var scope = (document.querySelector('input[name="gd-scope"]:checked') || {}).value === 'full' ? 'full' : 'file';
+    if (cid !== (driveCfg.clientId || '') || scope !== (driveCfg.scope || 'file')) { driveToken = ''; tokenClient = null; }
+    driveCfg.clientId = cid;
+    driveCfg.apiKey = key;
+    driveCfg.scope = scope;
+    driveCfg.appId = document.getElementById('gd-app').value.trim();
+    saveDriveCfg();
+    setDriveState();
+    setStatus(driveReady() ? 'Google Drive の設定を保存しました' : 'クライアントIDとAPIキーの両方が必要です');
+    libRefreshButtons();
+    if (driveReady()) closeDriveSettings();
+  });
+  document.getElementById('gd-folder-clear').addEventListener('click', function () { setDriveFolder('', ''); });
+  document.getElementById('gd-connect').addEventListener('click', function () {
+    driveCfg.clientId = document.getElementById('gd-client').value.trim();
+    driveCfg.apiKey = document.getElementById('gd-key').value.trim();
+    driveCfg.appId = document.getElementById('gd-app').value.trim();
+    driveCfg.scope = (document.querySelector('input[name="gd-scope"]:checked') || {}).value === 'full' ? 'full' : 'file';
+    saveDriveCfg();
+    driveToken = '';
+    tokenClient = null;
+    getToken('consent').then(function () { setStatus('Google に接続しました'); return libConnected(); }).catch(function (e) { setStatus((e && e.message) || String(e)); setDriveState(); });
+  });
+  document.getElementById('gd-signout').addEventListener('click', function () { driveSignOut(); setStatus('Google との接続を解除しました'); });
+
+  // Drive から .md を開く
+  function openFromDrive() {
+    pickDrive('md').then(function (f) {
+      if (!f) return;
+      if (!/\.(md|markdown|txt)$/i.test(f.name) && !/^text\//.test(f.mimeType || '') && !confirm('Markdown ではないかもしれません（' + f.name + '）。開きますか？')) return;
+      setStatus('Google Drive から読み込み中...');
+      return driveDownload(f.id).then(function (blob) { return blob.text(); }).then(function (text) {
+        driveFileId = f.id;
+        openText(text, f.name);
+        // 一覧のフォルダは変えない（チームの正本のまま）。開いたファイルは Update／Rollback できる
+        return driveFileMeta(f.id).catch(function () { return { id: f.id, name: f.name }; }).then(function (meta) {
+          libSelect(meta, text);
+          setStatus('Google Drive から読み込みました: ' + f.name);
+        });
+      });
+    }).catch(function (e) { setStatus((e && e.message) || String(e)); });
+  }
+  document.getElementById('btn-open-drive').addEventListener('click', openFromDrive);
+
+  /* ---------- 表 → PNG（note用の画像） ---------- */
+  // 記事側の tables_html.py と同じ決め方で列幅を出し、同じCSSで描いて html2canvas で画像にする
+  var NP = { fs: 25, pad: 14, avail: 1172, minTotal: 640, maxChars: 22, minChars: 5 };
+  var wrapEl = document.querySelector('.preview-wrap');
+  var tpngEl = document.getElementById('tpng');
+  var tpngSelect = document.getElementById('tpng-select');
+  var tpngName = document.getElementById('tpng-name');
+  var tpngSheet = document.getElementById('tpng-sheet');
+  var tpngFab = document.getElementById('tpng-fab');
+  var tpngIndex = -1;
+  var fabIndex = -1;
+  var caretTable = -1;
+
+  function previewTables() {
+    return Array.prototype.slice.call(pvEl.querySelectorAll('table'));
+  }
+
+  // セルの文字（<br> は改行として扱う）
+  function cellText(cell) {
+    var clone = cell.cloneNode(true);
+    Array.prototype.forEach.call(clone.querySelectorAll('br'), function (br) {
+      br.parentNode.replaceChild(document.createTextNode('\n'), br);
+    });
+    return clone.textContent.replace(/[ \t ]+/g, ' ').split('\n')
+      .map(function (s) { return s.trim(); }).join('\n').replace(/^\n+|\n+$/g, '');
+  }
+
+  // 表の内容・表題・注記・ファイル名を集める
+  function tableInfo(table, index) {
+    var header = [], rows = [];
+    Array.prototype.forEach.call(table.querySelectorAll('tr'), function (tr, i) {
+      var cells = Array.prototype.map.call(tr.querySelectorAll('th, td'), cellText);
+      if (i === 0) header = cells; else rows.push(cells);
+    });
+    var heading = '';
+    for (var el = table.previousElementSibling; el; el = el.previousElementSibling) {
+      if (/^H[1-6]$/.test(el.nodeName)) { heading = el.textContent.trim(); break; }
+    }
+    var title = /^表\d+｜/.test(heading) ? heading : ('表' + (index + 1) + (heading ? '｜' + heading : ''));
+    var note = '', file = '', n = 0;
+    for (el = table.nextElementSibling; el && n < 2 && el.nodeName === 'P'; el = el.nextElementSibling, n++) {
+      var t = el.textContent.trim();
+      var m = /^画像ファイル[：:]\s*([^\s（）()]+\.png)$/i.exec(t);
+      if (m) file = m[1];
+      else if (!note && /^(※|出典|（出典|\(出典)/.test(t)) note = t;
+      else break;
+    }
+    if (!file) file = sanitizeFileName(stripDateSuffix(getBaseName()).replace(/_表ソース$/, '')) + '_表' + p2(index + 1) + '.png';
+    return { index: index, title: title, header: header, rows: rows, note: note, file: file };
+  }
+
+  function npTextW(s, fs) {
+    var w = 0;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c >= 0xD800 && c <= 0xDBFF) continue;
+      w += (c > 0x2E80 ? 1 : 0.55);
+    }
+    return w * fs;
+  }
+
+  function npColWidths(header, rows) {
+    var fs = NP.fs, pad = NP.pad, ncol = header.length, maxw = [], i;
+    function lineW(s) {
+      return Math.max.apply(null, String(s).split('\n').map(function (l) { return npTextW(l, fs); }));
+    }
+    for (i = 0; i < ncol; i++) {
+      var w = lineW(header[i]) * 1.05;
+      rows.forEach(function (r) { w = Math.max(w, lineW(r[i] || '')); });
+      maxw.push(Math.min(w, NP.maxChars * fs) + 2 * pad);
+    }
+    var total = maxw.reduce(function (a, b) { return a + b; }, 0);
+    if (total > NP.avail) {
+      var minw = NP.minChars * fs + 2 * pad;
+      var fixed = maxw.map(function () { return false; });
+      for (var k = 0; k <= ncol; k++) {
+        var rest = NP.avail, nat = 0;
+        for (i = 0; i < ncol; i++) { if (fixed[i]) rest -= minw; else nat += maxw[i]; }
+        nat = nat || 1;
+        var alloc = maxw.map(function (w2, j) { return fixed[j] ? minw : w2 * rest / nat; });
+        var changed = false;
+        for (i = 0; i < ncol; i++) { if (!fixed[i] && alloc[i] < minw) { fixed[i] = true; changed = true; } }
+        if (!changed) { maxw = alloc; break; }
+      }
+    } else {
+      var used = Math.max(total, NP.minTotal), extra = (used - total) / ncol;
+      maxw = maxw.map(function (w3) { return w3 + extra; });
+    }
+    return maxw.map(function (w4) { return Math.round(w4); });
+  }
+
+  function npCellClass(s) {
+    var t = s.trim();
+    if (/^[○◯〇]/.test(t)) return 'ok';
+    if (t === '−' || t === '-' || t === 'ー' || t === '―' || t === '—') return 'none';
+    return '';
+  }
+
+  function npLines(el, text) {
+    String(text).split('\n').forEach(function (part, i) {
+      if (i) el.appendChild(document.createElement('br'));
+      el.appendChild(document.createTextNode(part));
+    });
+  }
+
+  function buildNoteTable(info) {
+    var ncol = Math.max(info.header.length, info.rows.reduce(function (m, r) { return Math.max(m, r.length); }, 0));
+    var header = info.header.slice();
+    while (header.length < ncol) header.push('');
+    var rows = info.rows.map(function (r) { r = r.slice(); while (r.length < ncol) r.push(''); return r; });
+    var widths = npColWidths(header, rows);
+    var tw = widths.reduce(function (a, b) { return a + b; }, 0);
+
+    var wrap = document.createElement('div');
+    wrap.className = 'np-wrap';
+    wrap.style.width = (tw + 28) + 'px';
+    var title = document.createElement('p');
+    title.className = 'np-title';
+    title.textContent = info.title;
+    wrap.appendChild(title);
+
+    var table = document.createElement('table');
+    table.style.width = tw + 'px';
+    var cg = document.createElement('colgroup');
+    widths.forEach(function (w) { var col = document.createElement('col'); col.style.width = w + 'px'; cg.appendChild(col); });
+    table.appendChild(cg);
+    var thead = document.createElement('thead'), htr = document.createElement('tr');
+    header.forEach(function (h) { var th = document.createElement('th'); npLines(th, h); htr.appendChild(th); });
+    thead.appendChild(htr);
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      r.forEach(function (c) {
+        var td = document.createElement('td');
+        var cls = npCellClass(c);
+        if (cls) td.className = cls;
+        npLines(td, c);
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    if (info.note) {
+      var note = document.createElement('p');
+      note.className = 'np-note';
+      note.textContent = info.note;
+      wrap.appendChild(note);
+    }
+    return wrap;
+  }
+
+  function showTablePng(index) {
+    var tables = previewTables();
+    if (!tables[index]) return;
+    tpngIndex = index;
+    tpngSelect.value = String(index);
+    var info = tableInfo(tables[index], index);
+    tpngName.value = info.file;
+    tpngSheet.innerHTML = '';
+    tpngSheet.appendChild(buildNoteTable(info));
+  }
+
+  function openTablePng(index) {
+    flushAll();
+    var tables = previewTables();
+    if (!tables.length) { setStatus('プレビューに表がありません'); return; }
+    tpngSelect.innerHTML = '';
+    tables.forEach(function (t, i) {
+      var info = tableInfo(t, i);
+      var opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = info.title.length > 36 ? info.title.slice(0, 36) + '…' : info.title;
+      tpngSelect.appendChild(opt);
+    });
+    var canDrive = driveReady() && !!driveCfg.folderId;
+    var dr = document.querySelector('input[name="tpng-dest"][value="' + (canDrive ? 'drive' : 'local') + '"]');
+    if (dr) dr.checked = true;
+    tpngEl.hidden = false;
+    showTablePng(Math.min(Math.max(index, 0), tables.length - 1));
+  }
+
+  function closeTablePng() {
+    tpngEl.hidden = true;
+    tpngSheet.innerHTML = '';
+  }
+
+  var html2canvasLoading = null;
+  function loadHtml2Canvas() {
+    if (typeof window.html2canvas !== 'undefined') return Promise.resolve();
+    if (html2canvasLoading) return html2canvasLoading;
+    html2canvasLoading = loadScript(HTML2CANVAS_URL).catch(function (e) {
+      html2canvasLoading = null;
+      throw e;
+    });
+    return html2canvasLoading;
+  }
+
+  // 2倍で描いて等倍に縮小する（文字の輪郭がなめらかになる。記事側のPNGと同じ作り方）
+  function elementToPng(el) {
+    var fonts = document.fonts ? document.fonts.ready : Promise.resolve();
+    return Promise.all([loadHtml2Canvas(), fonts])
+      .then(function () {
+        return window.html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
       })
-      .then(function () { setStatus('PDFをダウンロードしました'); })
-      .catch(function () { setStatus('PDF生成に失敗しました。「PDF出力（印刷）」をお試しください'); })
+      .then(function (big) {
+        var c = document.createElement('canvas');
+        c.width = Math.round(big.width / 2);
+        c.height = Math.round(big.height / 2);
+        var ctx = c.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(big, 0, 0, c.width, c.height);
+        return new Promise(function (resolve, reject) {
+          c.toBlob(function (blob) { if (blob) resolve(blob); else reject(new Error('画像を作れませんでした')); }, 'image/png');
+        });
+      });
+  }
+
+  function tpngDest() {
+    return (document.querySelector('input[name="tpng-dest"]:checked') || {}).value || 'local';
+  }
+
+  // 表 index を PNG にして、ローカルまたは Drive に保存する
+  function saveTablePng(index, name) {
+    showTablePng(index);
+    var fname = sanitizeFileName(name || tpngName.value) || ('table_' + p2(index + 1));
+    if (!/\.png$/i.test(fname)) fname += '.png';
+    var dest = tpngDest();
+    return elementToPng(tpngSheet.firstChild).then(function (blob) {
+      if (dest === 'drive') {
+        // 一覧のフォルダの images/ に入れる（記事の画像リンク版と同じ置き場所）
+        return driveEnsureSubfolder(driveCfg.folderId, 'images').then(function (imgFolderId) {
+          return driveUpload(fname, blob, 'image/png', imgFolderId);
+        }).then(function () {
+          forgetImage('images/' + fname);
+          return fname;
+        });
+      }
+      downloadBlob(blob, fname);
+      return fname;
+    });
+  }
+
+  document.getElementById('tpng-save').addEventListener('click', function () {
+    var btn = this;
+    btn.disabled = true;
+    setStatus('PNGを生成中...');
+    var prep = tpngDest() === 'drive' ? ensureDriveFolder() : Promise.resolve();
+    prep.then(function () { return saveTablePng(tpngIndex, tpngName.value); })
+      .then(function (fname) { setStatus((tpngDest() === 'drive' ? 'Google Drive の images に保存しました: ' : 'PNGを保存しました: ') + fname); if (tpngDest() === 'drive' && mdEl.value) renderPreview(mdEl.value); })
+      .catch(function (e) { setStatus('PNGを保存できませんでした: ' + ((e && e.message) || e)); })
       .then(function () { btn.disabled = false; });
   });
 
+  document.getElementById('tpng-save-all').addEventListener('click', function () {
+    var btn = this;
+    var count = previewTables().length;
+    var i = 0, saved = 0;
+    btn.disabled = true;
+    setStatus('PNGを生成中...');
+    var prep = tpngDest() === 'drive' ? ensureDriveFolder() : Promise.resolve();
+    prep.then(function next() {
+      if (i >= count) {
+        setStatus('PNGを' + saved + '枚保存しました' + (tpngDest() === 'drive' ? '（Google Drive）' : ''));
+        btn.disabled = false;
+        return;
+      }
+      var idx = i++;
+      return saveTablePng(idx, null)
+        .then(function () { saved++; setStatus('PNGを保存中... ' + saved + '/' + count); return wait(500); })
+        .then(next);
+    }).catch(function (e) {
+      setStatus('PNGを保存できませんでした（' + (i) + '枚目）: ' + ((e && e.message) || e));
+      btn.disabled = false;
+    });
+  });
+
+  tpngSelect.addEventListener('change', function () { showTablePng(Number(tpngSelect.value)); });
+  document.getElementById('tpng-close').addEventListener('click', closeTablePng);
+  tpngEl.addEventListener('click', function (e) { if (e.target === tpngEl) closeTablePng(); });
+
+  // カーソルがある表を覚えておく（ボタンを押すとプレビューがblurして描き直されるため、位置は番号で持つ）
+  document.addEventListener('selectionchange', function () {
+    if (document.activeElement !== pvEl) return;
+    var sel = window.getSelection();
+    var node = sel && sel.rangeCount ? sel.anchorNode : null;
+    if (node && node.nodeType !== 1) node = node.parentNode;
+    var table = node && node.closest ? node.closest('table') : null;
+    caretTable = (table && pvEl.contains(table)) ? previewTables().indexOf(table) : -1;
+  });
+
+  document.getElementById('btn-table-png').addEventListener('click', function () {
+    openTablePng(caretTable < 0 ? 0 : caretTable);
+  });
+
+  /* ---------- 画像の差し替え ---------- */
+  var imgDlg = document.getElementById('img-dlg');
+  var imgFab = document.getElementById('img-fab');
+  var imgInput = document.getElementById('img-input');
+  var imgIndex = -1;
+  var imgFabIndex = -1;
+  var imgNew = null;   // { dataUrl, width, height, name, bytes }
+
+  function previewImages() {
+    return Array.prototype.slice.call(pvEl.querySelectorAll('img'));
+  }
+  function kb(n) { return Math.round(n / 1024) + ' KB'; }
+  function srcInfo(src) {
+    if (!src) return '（画像なし）';
+    if (/^data:/.test(src)) return 'Markdown に埋め込み（約 ' + kb(src.length * 3 / 4) + '）';
+    return src.length > 60 ? src.slice(0, 60) + '…' : src;
+  }
+  // 画像ファイル → data URL（shrink のとき幅1280pxを超えるものは縮小。JPEG は JPEG のまま）
+  function fileToDataUrl(file, shrink) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var dataUrl = String(reader.result || '');
+        var im = new Image();
+        im.onload = function () {
+          var w = im.naturalWidth, h = im.naturalHeight;
+          if (shrink && w > 1280) {
+            var c = document.createElement('canvas');
+            var ratio = 1280 / w;
+            c.width = 1280;
+            c.height = Math.round(h * ratio);
+            var ctx = c.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(im, 0, 0, c.width, c.height);
+            var jpeg = /jpe?g$/i.test(file.type) || /\.jpe?g$/i.test(file.name || '');
+            dataUrl = jpeg ? c.toDataURL('image/jpeg', 0.9) : c.toDataURL('image/png');
+            w = c.width; h = c.height;
+          }
+          resolve({ dataUrl: dataUrl, width: w, height: h, name: file.name || '', bytes: Math.round(dataUrl.length * 3 / 4) });
+        };
+        im.onerror = function () { reject(new Error('画像として読み込めませんでした: ' + (file.name || ''))); };
+        im.src = dataUrl;
+      };
+      reader.onerror = function () { reject(new Error('ファイルを読み込めませんでした')); };
+      reader.readAsDataURL(file);
+    });
+  }
+  function setImgNew(info) {
+    imgNew = info;
+    var el = document.getElementById('img-new');
+    el.src = info ? info.dataUrl : '';
+    document.getElementById('img-new-info').textContent = info ? (info.name + '（' + info.width + 'x' + info.height + 'px・約 ' + kb(info.bytes) + '）') : '新しい画像（未選択）';
+    document.getElementById('img-apply').disabled = !info;
+  }
+  function openImgDlg(index) {
+    var imgs = previewImages();
+    var img = imgs[index];
+    if (!img) return;
+    imgIndex = index;
+    var cur = document.getElementById('img-cur');
+    cur.src = img.getAttribute('src') || '';
+    document.getElementById('img-cur-info').textContent = '今の画像: ' + srcInfo(img.getAttribute('data-src') || img.getAttribute('src')) +
+      (img.naturalWidth ? '　' + img.naturalWidth + 'x' + img.naturalHeight + 'px' : '　（表示できていません）') +
+      (img.getAttribute('alt') ? '　alt: ' + img.getAttribute('alt') : '');
+    setImgNew(null);
+    imgDlg.hidden = false;
+  }
+  function closeImgDlg() {
+    imgDlg.hidden = true;
+    setImgNew(null);
+  }
+  function pickedImageFile(file) {
+    if (!file) return;
+    setStatus('画像を読み込み中...');
+    fileToDataUrl(file, document.getElementById('img-shrink').checked)
+      .then(function (info) { setImgNew(info); setStatus('画像を読み込みました: ' + info.name); })
+      .catch(function (e) { setStatus((e && e.message) || String(e)); });
+  }
+  document.getElementById('img-pick-local').addEventListener('click', function () {
+    imgInput.value = '';
+    imgInput.click();
+  });
+  imgInput.addEventListener('change', function () { pickedImageFile(imgInput.files && imgInput.files[0]); });
+  document.getElementById('img-pick-drive').addEventListener('click', function () {
+    pickDrive('image').then(function (f) {
+      if (!f) return;
+      setStatus('Google Drive から画像を読み込み中...');
+      return driveDownload(f.id).then(function (blob) {
+        pickedImageFile(new File([blob], f.name, { type: blob.type || f.mimeType || '' }));
+      });
+    }).catch(function (e) { setStatus((e && e.message) || String(e)); });
+  });
+  document.getElementById('img-apply').addEventListener('click', function () {
+    if (!imgNew) return;
+    var img = previewImages()[imgIndex];
+    if (!img) { setStatus('差し替える画像が見つかりません（プレビューが変わりました）'); closeImgDlg(); return; }
+    img.removeAttribute('width');
+    img.removeAttribute('height');
+    var newName = imgNew.name;
+    img.removeAttribute('data-src');
+    img.src = imgNew.dataUrl;
+    syncFromPreview();
+    closeImgDlg();
+    setStatus('画像を差し替えました（' + newName + '）。「保存」で Markdown に書き出してください');
+  });
+  document.getElementById('img-close').addEventListener('click', closeImgDlg);
+  imgDlg.addEventListener('click', function (e) { if (e.target === imgDlg) closeImgDlg(); });
+
+  /* ---------- プレビュー上の浮きボタン（表・画像） ---------- */
+  var fabTable = null;
+  var fabImg = null;
+  function hideFab() { tpngFab.hidden = true; fabTable = null; }
+  function hideImgFab() { imgFab.hidden = true; fabImg = null; }
+  function placeFab(table) {
+    if (!table || !table.isConnected) { hideFab(); return; }
+    fabTable = table;
+    fabIndex = previewTables().indexOf(table);
+    tpngFab.hidden = false;
+    var r = table.getBoundingClientRect(), w = wrapEl.getBoundingClientRect();
+    tpngFab.style.top = Math.max(0, r.top - w.top + wrapEl.scrollTop - tpngFab.offsetHeight - 4) + 'px';
+    tpngFab.style.left = Math.max(0, r.right - w.left + wrapEl.scrollLeft - tpngFab.offsetWidth) + 'px';
+  }
+  function placeImgFab(img) {
+    if (!img || !img.isConnected) { hideImgFab(); return; }
+    fabImg = img;
+    imgFabIndex = previewImages().indexOf(img);
+    imgFab.hidden = false;
+    var r = img.getBoundingClientRect(), w = wrapEl.getBoundingClientRect();
+    imgFab.style.top = Math.max(0, r.top - w.top + wrapEl.scrollTop + 4) + 'px';
+    imgFab.style.left = Math.max(0, r.right - w.left + wrapEl.scrollLeft - imgFab.offsetWidth - 4) + 'px';
+  }
+  pvEl.addEventListener('mousemove', function (e) {
+    var t = e.target;
+    var table = t.closest ? t.closest('table') : null;
+    var img = t.nodeName === 'IMG' ? t : null;
+    if (table) { if (table !== fabTable || tpngFab.hidden) placeFab(table); } else if (!tpngFab.hidden) hideFab();
+    if (img) { if (img !== fabImg || imgFab.hidden) placeImgFab(img); } else if (!imgFab.hidden) hideImgFab();
+  });
+  pvEl.addEventListener('mouseleave', function (e) {
+    if (e.relatedTarget !== tpngFab) hideFab();
+    if (e.relatedTarget !== imgFab) hideImgFab();
+  });
+  tpngFab.addEventListener('mouseleave', function (e) {
+    if (!(e.relatedTarget && pvEl.contains(e.relatedTarget))) hideFab();
+  });
+  imgFab.addEventListener('mouseleave', function (e) {
+    if (!(e.relatedTarget && pvEl.contains(e.relatedTarget))) hideImgFab();
+  });
+  wrapEl.addEventListener('scroll', function () {
+    if (!tpngFab.hidden) placeFab(fabTable);
+    if (!imgFab.hidden) placeImgFab(fabImg);
+  });
+  tpngFab.addEventListener('mousedown', function (e) { e.preventDefault(); });
+  imgFab.addEventListener('mousedown', function (e) { e.preventDefault(); });
+  tpngFab.addEventListener('click', function () {
+    hideFab();
+    openTablePng(fabIndex);
+  });
+  imgFab.addEventListener('click', function () {
+    var idx = imgFabIndex;
+    hideImgFab();
+    flushAll();
+    openImgDlg(idx);
+  });
+
+  function closeAnyDialog() {
+    var closed = false;
+    if (!imgDlg.hidden) { closeImgDlg(); closed = true; }
+    else if (!gdDlg.hidden) { closeDriveSettings(); closed = true; }
+    else if (!saveDlg.hidden) { closeSaveDlg(); closed = true; }
+    else if (!tpngEl.hidden) { closeTablePng(); closed = true; }
+    return closed;
+  }
+
+  refreshFolderLabels();
+
+  /* ---------- 左のファイル一覧（ポータル）: Google Drive のフォルダがチームの正本 ---------- */
+  // lib.current = { id, name, modifiedTime, version, lastModifiedBy, webViewLink }（Drive のファイル）
+  var lib = { files: [], loaded: false, loading: false, current: null, loadedText: null, versions: [], user: null };
+  var libEl = document.getElementById('lib');
+  var libListEl = document.getElementById('lib-list');
+  var libVerListEl = document.getElementById('lib-ver-list');
+  var libFilterEl = document.getElementById('lib-filter');
+  var libConnectEl = document.getElementById('lib-connect');
+  var btnUpdate = document.getElementById('btn-update');
+  var btnRollback = document.getElementById('btn-rollback');
+  var LIB_OPEN_KEY = 'md2pdf:lib:open';
+  var FILE_FIELDS = 'id,name,mimeType,modifiedTime,size,version,webViewLink,lastModifyingUser(displayName)';
+  var imgCache = {};        // 相対パス -> objectURL（一覧のフォルダの画像）
+  var driveChildCache = {}; // "親ID/名前" -> ID
+  var teamCfgLoaded = false;
+
+  function isTextName(name) { return /\.(md|markdown|txt)$/i.test(name || ''); }
+  function fmtTime(t) {
+    var d = t instanceof Date ? t : new Date(t);
+    if (isNaN(d.getTime())) return '';
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+  }
+  function fmtSize(n) { n = Number(n) || 0; return n < 1024 ? n + ' B' : Math.round(n / 1024) + ' KB'; }
+  function isDirty() { return !!(lib.current && lib.loadedText !== null && mdEl.value !== lib.loadedText); }
+  function libConnectedNow() { return !!driveToken && Date.now() < driveTokenExp - 60000; }
+
+  // IndexedDB（開いているファイルと、その読み込み時の内容を覚えておく。再読み込み後に続きから編集できる）
+  function idbOpen() {
+    return new Promise(function (resolve, reject) {
+      if (!window.indexedDB) { reject(new Error('IndexedDB が使えません')); return; }
+      var req = indexedDB.open('md2pdf-lib', 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore('kv'); };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error); };
+    });
+  }
+  function idbGet(key) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var r = db.transaction('kv').objectStore('kv').get(key);
+        r.onsuccess = function () { resolve(r.result); };
+        r.onerror = function () { reject(r.error); };
+      });
+    });
+  }
+  function idbSet(key, val) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction('kv', 'readwrite');
+        tx.objectStore('kv').put(val, key);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    });
+  }
+  function persistCurrent() {
+    var v = lib.current ? { id: lib.current.id, name: lib.current.name, modifiedTime: lib.current.modifiedTime || '', version: lib.current.version || '', text: lib.loadedText || '' } : null;
+    idbSet('current', v).catch(function () { /* ignore */ });
+  }
+
+  /* --- Google Drive の読み書き --- */
+  function fileFromMeta(f) {
+    return {
+      id: f.id, name: f.name, modifiedTime: f.modifiedTime || '', size: f.size, version: f.version || '',
+      webViewLink: f.webViewLink || '', lastModifiedBy: (f.lastModifyingUser && f.lastModifyingUser.displayName) || ''
+    };
+  }
+  function driveListFolder(folderId) {
+    var q = "'" + folderId + "' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'";
+    return driveFetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) +
+      '&fields=files(' + FILE_FIELDS + ')&orderBy=name&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true')
+      .then(function (r) { return r.json(); })
+      .then(function (j) { return (j.files || []).filter(function (f) { return isTextName(f.name); }).map(fileFromMeta); });
+  }
+  function driveFileMeta(id) {
+    return driveGetMeta(id, FILE_FIELDS).then(fileFromMeta);
+  }
+  function driveReadText(file) { return driveDownload(file.id).then(function (b) { return b.text(); }); }
+  function driveWriteText(file, text) {
+    return driveFetch('https://www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(file.id) + '?uploadType=media&supportsAllDrives=true&fields=' + encodeURIComponent(FILE_FIELDS),
+      { method: 'PATCH', headers: { 'Content-Type': 'text/markdown' }, body: new Blob([text], { type: 'text/markdown;charset=utf-8' }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var meta = fileFromMeta(j);
+        // 新しい版を消されないように keepForever（失敗しても気にしない。1ファイル200版まで）
+        return driveRevisions(file).then(function (revs) {
+          if (!revs.length) return meta;
+          return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '/revisions/' + encodeURIComponent(revs[0].id),
+            { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keepForever: true }) })
+            .catch(function () { /* ignore */ }).then(function () { return meta; });
+        }).catch(function () { return meta; });
+      });
+  }
+  function driveRevisions(file) {
+    return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '/revisions?fields=revisions(id,modifiedTime,size,keepForever,lastModifyingUser(displayName))&pageSize=200')
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var list = (j.revisions || []).map(function (v) {
+          return { id: v.id, time: new Date(v.modifiedTime).getTime(), size: v.size, by: (v.lastModifyingUser && v.lastModifyingUser.displayName) || '' };
+        });
+        list.sort(function (a, b) { return b.time - a.time; });
+        return list;
+      });
+  }
+  function driveReadRevision(file, v) {
+    return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '/revisions/' + encodeURIComponent(v.id) + '?alt=media')
+      .then(function (r) { return r.text(); });
+  }
+  function driveCreateText(name, text) {
+    return driveUpload(name, new Blob([text], { type: 'text/markdown;charset=utf-8' }), 'text/markdown', driveCfg.folderId)
+      .then(function (j) { return driveFileMeta(j.id).catch(function () { return { id: j.id, name: name }; }); });
+  }
+  function driveFindChild(parentId, name, isFolder) {
+    var key = parentId + '/' + name;
+    if (driveChildCache[key]) return Promise.resolve(driveChildCache[key]);
+    var q = "'" + parentId + "' in parents and name = '" + name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "' and trashed = false" +
+      (isFolder ? " and mimeType = 'application/vnd.google-apps.folder'" : '');
+    return driveFetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=files(id,name)&pageSize=2&supportsAllDrives=true&includeItemsFromAllDrives=true')
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var f = j.files && j.files[0];
+        if (!f) throw new Error('not found: ' + name);
+        driveChildCache[key] = f.id;
+        return f.id;
+      });
+  }
+  function driveEnsureSubfolder(parentId, name) {
+    if (!parentId) return Promise.reject(new Error('先に一覧のフォルダを選んでください'));
+    return driveFindChild(parentId, name, true).catch(function () {
+      return driveFetch('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id,name',
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] }) })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { driveChildCache[parentId + '/' + name] = j.id; return j.id; });
+    });
+  }
+  function driveReadBinary(path) {
+    var parts = path.split('/').filter(function (s) { return s && s !== '.'; });
+    var p = Promise.resolve(driveCfg.folderId);
+    parts.slice(0, -1).forEach(function (seg) {
+      p = p.then(function (pid) { return driveFindChild(pid, seg, true); });
+    });
+    return p.then(function (pid) { return driveFindChild(pid, parts[parts.length - 1], false); }).then(driveDownload);
+  }
+  function driveWhoAmI() {
+    return driveFetch('https://www.googleapis.com/drive/v3/about?fields=user(displayName,emailAddress)')
+      .then(function (r) { return r.json(); })
+      .then(function (j) { return (j && j.user) || null; })
+      .catch(function () { return null; });
+  }
+
+  // 一覧のフォルダにある画像（images/xxx.png などの相対パス）をプレビューで表示する。Markdown のパスはそのまま
+  function resolveLibImages(root) {
+    if (!driveCfg.folderId || !libConnectedNow()) return;
+    Array.prototype.forEach.call(root.querySelectorAll('img'), function (img) {
+      var src = img.getAttribute('src') || '';
+      if (!src || /^(data:|blob:|https?:|\/\/)/i.test(src) || img.hasAttribute('data-src')) return;
+      var path = readableUrl(src);
+      img.setAttribute('data-src', path);
+      if (imgCache[path]) { img.src = imgCache[path]; return; }
+      driveReadBinary(path).then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        imgCache[path] = url;
+        if (img.isConnected) img.src = url;
+      }).catch(function () { /* そのまま（表示できない） */ });
+    });
+  }
+  function forgetImage(path) {
+    if (imgCache[path]) { try { URL.revokeObjectURL(imgCache[path]); } catch (e) { /* ignore */ } delete imgCache[path]; }
+    Object.keys(driveChildCache).forEach(function (k) { if (k.slice(k.lastIndexOf('/') + 1) === path.slice(path.lastIndexOf('/') + 1)) delete driveChildCache[k]; });
+  }
+  function clearImgCache() {
+    Object.keys(imgCache).forEach(function (k) { try { URL.revokeObjectURL(imgCache[k]); } catch (e) { /* ignore */ } });
+    imgCache = {};
+    driveChildCache = {};
+  }
+
+  /* --- 画面 --- */
+  function libSetOpen(open) {
+    libEl.hidden = !open;
+    document.querySelector('main').classList.toggle('lib-open', open);
+    try { localStorage.setItem(LIB_OPEN_KEY, open ? '1' : '0'); } catch (e) { /* ignore */ }
+  }
+  document.getElementById('btn-lib').addEventListener('click', function () { libSetOpen(libEl.hidden); });
+
+  function libRenderList() {
+    var q = (libFilterEl.value || '').trim().toLowerCase();
+    libListEl.innerHTML = '';
+    var shown = 0;
+    lib.files.forEach(function (f) {
+      if (q && f.name.toLowerCase().indexOf(q) < 0) return;
+      var li = document.createElement('li');
+      li.setAttribute('data-name', f.name);
+      li.setAttribute('data-id', f.id);
+      if (lib.current && lib.current.id === f.id) li.className = 'sel' + (isDirty() ? ' dirty' : '');
+      var fn = document.createElement('span');
+      fn.className = 'fn';
+      fn.textContent = f.name;
+      var meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = (f.modifiedTime ? fmtTime(f.modifiedTime) : '') + (f.lastModifiedBy ? '　' + f.lastModifiedBy : '') + (f.size !== undefined && f.size !== null ? '　' + fmtSize(f.size) : '');
+      if (f.webViewLink) {
+        var a = document.createElement('a');
+        a.href = f.webViewLink;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = 'Drive';
+        a.title = 'Google Drive で開く';
+        a.addEventListener('click', function (e) { e.stopPropagation(); });
+        meta.appendChild(a);
+      }
+      li.appendChild(fn);
+      li.appendChild(meta);
+      li.addEventListener('click', function () { libOpenFile(f); });
+      libListEl.appendChild(li);
+      shown++;
+    });
+    if (!shown) {
+      var e = document.createElement('li');
+      e.className = 'empty';
+      e.textContent = lib.files.length ? '一致するファイルがありません'
+        : !driveReady() ? '「Drive設定」でクライアントIDとAPIキーを入れてください'
+        : !driveCfg.folderId ? '「フォルダ」でチームのフォルダを選んでください'
+        : !lib.loaded ? 'Google Drive に接続してください'
+        : (driveCfg.scope === 'full' ? 'このフォルダに .md がありません' : 'このフォルダに、このツールから見える .md がありません（「ファイルを追加」で加えるか、Drive設定で権限を drive にする）');
+      libListEl.appendChild(e);
+    }
+  }
+  function libRenderVersions() {
+    libVerListEl.innerHTML = '';
+    document.getElementById('lib-ver-name').textContent = lib.current ? lib.current.name : '';
+    if (!lib.current) {
+      var e0 = document.createElement('li'); e0.className = 'empty'; e0.textContent = 'ファイルを選ぶと履歴が出ます'; libVerListEl.appendChild(e0);
+      return;
+    }
+    if (!lib.versions.length) {
+      var e1 = document.createElement('li'); e1.className = 'empty'; e1.textContent = '前の版はまだありません（Update すると残ります）'; libVerListEl.appendChild(e1);
+      return;
+    }
+    lib.versions.forEach(function (v, i) {
+      var li = document.createElement('li');
+      var m = document.createElement('span');
+      m.className = 'vmeta';
+      var t1 = document.createElement('span');
+      t1.textContent = (i === 0 ? '1つ前　' : (i + 1) + 'つ前　') + fmtTime(v.time);
+      var t2 = document.createElement('span');
+      t2.className = 'vsub';
+      t2.textContent = (v.by ? v.by + '　' : '') + (v.size !== undefined ? fmtSize(v.size) : '');
+      m.appendChild(t1);
+      m.appendChild(t2);
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = '戻す';
+      b.addEventListener('click', function () { libRestore(v, i); });
+      li.appendChild(m);
+      li.appendChild(b);
+      libVerListEl.appendChild(li);
+    });
+  }
+  function libRefreshButtons() {
+    var cur = !!lib.current;
+    btnUpdate.disabled = !cur;
+    btnUpdate.classList.toggle('primary', cur);
+    btnUpdate.classList.toggle('dirty', isDirty());
+    btnRollback.disabled = !(cur && lib.versions.length);
+    document.getElementById('lib-add-drive').hidden = !(driveReady() && driveCfg.folderId && driveCfg.scope !== 'full' && libConnectedNow());
+    var connected = libConnectedNow();
+    libConnectEl.hidden = connected || !driveReady();
+    document.getElementById('lib-connect-msg').textContent = driveCfg.folderId
+      ? 'Google に接続すると「' + (driveCfg.folderName || 'フォルダ') + '」の一覧を読み込みます'
+      : 'Google に接続して、チームのフォルダを選んでください';
+    var title = document.querySelector('.lib-title');
+    title.textContent = 'Google Drive' + (lib.user ? '　' + (lib.user.displayName || lib.user.emailAddress || '') : '');
+    title.title = lib.user && lib.user.emailAddress ? lib.user.emailAddress : '';
+    refreshFolderLabels();
+    Array.prototype.forEach.call(libListEl.querySelectorAll('li.sel'), function (li) { li.classList.toggle('dirty', isDirty()); });
+  }
+  var dirtyTimer = null;
+  function scheduleDirtyCheck() {
+    clearTimeout(dirtyTimer);
+    dirtyTimer = setTimeout(libRefreshButtons, 400);
+  }
+  mdEl.addEventListener('input', scheduleDirtyCheck);
+  pvEl.addEventListener('input', scheduleDirtyCheck);
+  window.addEventListener('beforeunload', function (e) {
+    if (isDirty()) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  function libSelect(file, text) {
+    lib.current = file || null;
+    lib.loadedText = file ? (typeof text === 'string' ? text : mdEl.value) : null;
+    lib.versions = [];
+    persistCurrent();
+    libRefreshButtons();
+    libRenderList();
+    libRenderVersions();
+    if (file) libLoadVersions();
+  }
+  function libLoadVersions() {
+    var cur = lib.current;
+    if (!cur) return Promise.resolve();
+    return driveRevisions(cur).then(function (revs) {
+      if (!lib.current || lib.current.id !== cur.id) return;
+      // 先頭は今の内容なので、戻せる「前の版」はそれ以降
+      lib.versions = revs.slice(1);
+      libRenderVersions();
+      libRefreshButtons();
+    }).catch(function (e) {
+      if (!lib.current || lib.current.id !== cur.id) return;
+      lib.versions = [];
+      libRenderVersions();
+      libRefreshButtons();
+      setStatus('履歴を読めませんでした: ' + ((e && e.message) || e));
+    });
+  }
+  function libReload(quiet) {
+    if (!driveReady() || !driveCfg.folderId) { lib.files = []; lib.loaded = false; libRenderList(); libRefreshButtons(); return Promise.resolve(); }
+    if (!quiet) setStatus('一覧を読み込み中...');
+    lib.loading = true;
+    return driveListFolder(driveCfg.folderId).then(function (files) {
+      lib.loading = false;
+      files.sort(function (a, b) { return a.name.localeCompare(b.name, 'ja'); });
+      lib.files = files;
+      lib.loaded = true;
+      if (lib.current) {
+        var found = files.filter(function (f) { return f.id === lib.current.id; })[0];
+        if (found) {
+          // 他の人の更新を検知できるよう、読み込み時の modifiedTime は保つ
+          found.modifiedTime = lib.current.modifiedTime || found.modifiedTime;
+          found.version = lib.current.version || found.version;
+          lib.current = found;
+        }
+      }
+      clearImgCache();
+      libRenderList();
+      libRefreshButtons();
+      if (!quiet) setStatus('一覧: ' + files.length + ' ファイル');
+      if (mdEl.value) renderPreview(mdEl.value);
+    }).catch(function (e) {
+      lib.loading = false;
+      lib.loaded = false;
+      libRenderList();
+      libRefreshButtons();
+      setStatus('一覧を読めませんでした: ' + ((e && e.message) || e));
+    });
+  }
+  function libOpenFile(file) {
+    if (isDirty() && !confirm('「' + lib.current.name + '」の変更が Update されていません。破棄して「' + file.name + '」を開きますか？')) return;
+    setStatus('読み込み中: ' + file.name);
+    return driveFileMeta(file.id).catch(function () { return file; }).then(function (meta) {
+      return driveReadText(meta).then(function (text) {
+        driveFileId = meta.id;
+        openText(text, meta.name);
+        libSelect(meta, text);
+        setStatus('開きました: ' + meta.name + (meta.lastModifiedBy ? '（最終更新: ' + meta.lastModifiedBy + '　' + fmtTime(meta.modifiedTime) + '）' : ''));
+      });
+    }).catch(function (e) { setStatus('開けませんでした: ' + ((e && e.message) || e)); });
+  }
+  // 他の人が先に更新していないか（読み込んだときの modifiedTime と比べる）
+  function checkConflict(cur) {
+    return driveFileMeta(cur.id).then(function (meta) {
+      if (cur.modifiedTime && meta.modifiedTime && meta.modifiedTime !== cur.modifiedTime) {
+        var ok = confirm('「' + cur.name + '」は、あなたが開いたあとに更新されています。\n最終更新: ' + fmtTime(meta.modifiedTime) + (meta.lastModifiedBy ? '　' + meta.lastModifiedBy : '') +
+          '\n\nこのまま上書きしますか？（相手の内容は履歴に残ります。キャンセルして一覧から開き直すと相手の内容を確認できます）');
+        return ok ? meta : null;
+      }
+      return meta;
+    }, function () { return cur; });
+  }
+  function libUpdate() {
+    if (!lib.current) { setStatus('一覧でファイルを選ぶか、「一覧に追加（新規ファイル）」で作ってください'); return Promise.resolve(); }
+    flushAll();
+    var cur = lib.current;
+    var text = mdEl.value;
+    btnUpdate.disabled = true;
+    setStatus('Update 中: ' + cur.name);
+    return checkConflict(cur).then(function (meta) {
+      if (!meta) { setStatus('Update をやめました（一覧から開き直すと最新の内容を確認できます）'); return; }
+      return driveWriteText(cur, text).then(function (newMeta) {
+        lib.current = newMeta.id ? newMeta : cur;
+        lib.loadedText = text;
+        persistCurrent();
+        return Promise.all([libLoadVersions(), libReload(true)]).then(function () {
+          setStatus('Update しました: ' + cur.name + '（前の内容は履歴に残しました）');
+        });
+      });
+    }).catch(function (e) {
+      setStatus('Update できませんでした: ' + ((e && e.message) || e));
+    }).then(function () { libRefreshButtons(); });
+  }
+  function libRestore(v, index) {
+    var cur = lib.current;
+    if (!cur || !v) return Promise.resolve();
+    var label = (index === 0 ? '1つ前の版' : (index + 1) + 'つ前の版') + '（' + fmtTime(v.time) + (v.by ? '　' + v.by : '') + '）';
+    if (!confirm('「' + cur.name + '」を ' + label + ' に戻しますか？\n今の内容も履歴に残るので、あとで戻せます。')) return Promise.resolve();
+    btnRollback.disabled = true;
+    setStatus('戻しています: ' + label);
+    return checkConflict(cur).then(function (meta) {
+      if (!meta) { setStatus('Rollback をやめました'); return; }
+      return driveReadRevision(cur, v).then(function (text) {
+        return driveWriteText(cur, text).then(function (newMeta) {
+          driveFileId = cur.id;
+          openText(text, cur.name);
+          lib.current = newMeta.id ? newMeta : cur;
+          lib.loadedText = text;
+          persistCurrent();
+          return Promise.all([libLoadVersions(), libReload(true)]).then(function () {
+            setStatus('Rollback しました: ' + cur.name + ' を ' + label + ' に戻しました');
+          });
+        });
+      });
+    }).catch(function (e) {
+      setStatus('Rollback できませんでした: ' + ((e && e.message) || e));
+    }).then(function () { libRefreshButtons(); });
+  }
+  function libRollback() {
+    if (!lib.current || !lib.versions.length) return;
+    libRestore(lib.versions[0], 0);
+  }
+  function libNewFile() {
+    if (!driveReady() || !driveCfg.folderId) { setStatus('先に Google Drive に接続して、チームのフォルダを選んでください'); return; }
+    var base = stripDateSuffix(getBaseName()) || 'document';
+    var name = prompt('新しいファイルの名前（チームのフォルダに作ります）', base + '.md');
+    if (!name) return;
+    name = sanitizeFileName(name);
+    if (!isTextName(name)) name += '.md';
+    if (lib.files.some(function (f) { return f.name === name; }) && !confirm('同じ名前のファイルがあります。上書きしますか？')) return;
+    flushAll();
+    var text = mdEl.value;
+    setStatus('作成中: ' + name);
+    driveCreateText(name, text).then(function (file) {
+      driveFileId = file.id;
+      fileBase = sanitizeFileName(name.replace(/\.(md|markdown|txt)$/i, ''));
+      storageSet();
+      return libReload(true).then(function () {
+        var found = lib.files.filter(function (f) { return f.id === file.id; })[0] || file;
+        libSelect(found, text);
+        setStatus('一覧に追加しました: ' + name);
+      });
+    }).catch(function (e) { setStatus('作れませんでした: ' + ((e && e.message) || e)); });
+  }
+
+  // トークンを得たとき（接続ボタン・書き出し・PNG保存など、どこからでも）: 名前を出し、一覧を読み、前回開いていたファイルを選び直す
+  function onDriveToken() {
+    libRefreshButtons();
+    if (!lib.user) {
+      driveWhoAmI().then(function (u) { lib.user = u; libRefreshButtons(); });
+    }
+    if (driveCfg.folderId && !driveCfg.folderLink) {
+      // チーム設定（config.json）でフォルダが決まっているとき: 名前とリンクを補う
+      driveGetMeta(driveCfg.folderId, 'name,webViewLink').then(function (j) {
+        if (!j) return;
+        if (j.name) driveCfg.folderName = j.name;
+        if (j.webViewLink) driveCfg.folderLink = j.webViewLink;
+        refreshFolderLabels();
+      }).catch(function () { /* ignore */ });
+    }
+    if (driveCfg.folderId && !lib.loaded && !lib.loading) {
+      libReload().then(restoreCurrent);
+    } else if (!driveCfg.folderId) {
+      setStatus('接続しました。「フォルダ」でチームのフォルダを選んでください');
+    }
+  }
+  function libConnected() { onDriveToken(); return Promise.resolve(); }
+  function restoreCurrent() {
+    if (lib.current) return Promise.resolve();
+    return idbGet('current').then(function (c) {
+      if (!c || !c.id) return;
+      var found = lib.files.filter(function (f) { return f.id === c.id; })[0];
+      if (!found) return;
+      var base = sanitizeFileName(String(c.name || '').replace(/\.(md|markdown|txt)$/i, ''));
+      if (fileBase !== base) return;   // 別のファイルを編集中（または自動保存が無い）なら触らない
+      found.modifiedTime = c.modifiedTime || found.modifiedTime;
+      found.version = c.version || found.version;
+      lib.current = found;
+      lib.loadedText = c.text || '';
+      driveFileId = found.id;
+      lib.versions = [];
+      libRefreshButtons();
+      libRenderList();
+      libRenderVersions();
+      libLoadVersions();
+      setStatus('前回のファイルを選び直しました: ' + found.name + (isDirty() ? '（未保存の変更があります。Update で保存できます）' : ''));
+    }).catch(function () { /* ignore */ });
+  }
+  function libConnect() {
+    if (!driveReady()) { openDriveSettings(); return; }
+    var btn = document.getElementById('lib-connect-btn');
+    btn.disabled = true;
+    setStatus('Google に接続中...');
+    getToken('').catch(function (e) { setStatus((e && e.message) || String(e)); }).then(function () { btn.disabled = false; libRefreshButtons(); });
+  }
+  document.getElementById('lib-connect-btn').addEventListener('click', libConnect);
+  document.getElementById('lib-pick').addEventListener('click', function () {
+    pickDrive('folder').then(function (f) {
+      if (!f) return;
+      setDriveFolder(f.id, f.name);
+      lib.current = null;
+      lib.loadedText = null;
+      persistCurrent();
+      return libReload();
+    }).catch(function (e) { setStatus((e && e.message) || String(e)); });
+  });
+  document.getElementById('lib-reload').addEventListener('click', function () {
+    if (!libConnectedNow()) { libConnect(); return; }
+    libReload();
+  });
+  document.getElementById('lib-add-drive').addEventListener('click', function () {
+    // drive.file の権限では、Picker で選んだファイルだけが一覧に出せる
+    pickDriveMany().then(function (docs) {
+      if (!docs || !docs.length) return;
+      setStatus(docs.length + ' ファイルに権限を付けました');
+      return libReload();
+    }).catch(function (e) { setStatus((e && e.message) || String(e)); });
+  });
+  document.getElementById('lib-new').addEventListener('click', libNewFile);
+  libFilterEl.addEventListener('input', libRenderList);
+  btnUpdate.addEventListener('click', function () { libUpdate(); });
+  btnRollback.addEventListener('click', function () { libRollback(); });
+  document.getElementById('gd-reset').addEventListener('click', function () {
+    if (!confirm('この端末に保存した Google Drive の設定（クライアントID・APIキー・フォルダ）を消して、チーム設定（md2pdf-config.json）に戻しますか？')) return;
+    try { localStorage.removeItem(DRIVE_CFG_KEY); } catch (e) { /* ignore */ }
+    driveSignOut();
+    tokenClient = null;
+    driveCfg = {};
+    loadTeamConfig().then(function () { openDriveSettings(); libRefreshButtons(); setStatus('この端末の設定を消しました'); });
+  });
+
+  // Picker で複数のファイルを選ぶ（権限の付与）
+  function pickDriveMany() {
+    return getToken().then(function (token) {
+      return ensurePicker().then(function () { return token; });
+    }).then(function (token) {
+      return new Promise(function (resolve) {
+        var gp = window.google.picker;
+        var view = new gp.DocsView(gp.ViewId.DOCS).setIncludeFolders(true);
+        if (driveCfg.folderId && view.setParent) view.setParent(driveCfg.folderId);
+        if (view.setEnableDrives) view.setEnableDrives(true);
+        var b = new gp.PickerBuilder()
+          .addView(view)
+          .setOAuthToken(token)
+          .setDeveloperKey(driveCfg.apiKey)
+          .setLocale('ja')
+          .setTitle('一覧に加えるファイルを選ぶ（複数可）')
+          .setCallback(function (data) {
+            if (data.action === gp.Action.PICKED) resolve(data.docs || []);
+            else if (data.action === gp.Action.CANCEL) resolve([]);
+          });
+        if (gp.Feature && gp.Feature.MULTISELECT_ENABLED) b.enableFeature(gp.Feature.MULTISELECT_ENABLED);
+        if (driveCfg.appId) b.setAppId(driveCfg.appId);
+        b.build().setVisible(true);
+      });
+    });
+  }
+
+  // チーム共通の設定（index.html と同じ場所の md2pdf-config.json）。この端末で保存した設定があればそちらが優先
+  function loadTeamConfig() {
+    if (!/^https?:/.test(location.protocol)) return Promise.resolve();
+    return fetch(TEAM_CONFIG_URL, { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) throw new Error('no config');
+      return r.json();
+    }).then(function (cfg) {
+      if (!cfg || typeof cfg !== 'object') return;
+      teamCfgLoaded = true;
+      var merged = {};
+      ['clientId', 'apiKey', 'appId', 'scope', 'folderId', 'folderName', 'folderLink'].forEach(function (k) {
+        if (cfg[k] !== undefined && cfg[k] !== null && cfg[k] !== '') merged[k] = String(cfg[k]);
+      });
+      Object.keys(driveCfg).forEach(function (k) { if (driveCfg[k] !== undefined && driveCfg[k] !== '') merged[k] = driveCfg[k]; });
+      driveCfg = merged;
+      refreshFolderLabels();
+      libRefreshButtons();
+    }).catch(function () { /* 無ければ何もしない */ });
+  }
+
+  // 起動時: 一覧の表示状態を復元（既定は表示）、チーム設定を読む。Google へのログインはボタンから（ポップアップのため）
+  (function () {
+    var open = '1';
+    try { open = localStorage.getItem(LIB_OPEN_KEY) || '1'; } catch (e) { /* ignore */ }
+    libSetOpen(open === '1');
+    libRefreshButtons();
+    libRenderList();
+    loadTeamConfig().then(function () { libRenderList(); });
+  })();
+
   /* ---------- shortcuts ---------- */
   window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && closeAnyDialog()) return;
     if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
       e.preventDefault();
-      saveMarkdown();
+      if (!saveDlg.hidden) doSave();
+      else if (lib.current) libUpdate();
+      else openSaveDlg();
+      return;
     }
   });
 
