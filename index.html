@@ -565,7 +565,7 @@
       <button type="button" id="tpng-save-all">すべての表を保存</button>
       <button type="button" id="tpng-close">閉じる</button>
     </div>
-    <p class="dlg-hint" style="padding: 8px 14px 0;">プレビューの表を、記事用の見た目（幅1200px以内）で画像にします。表題は直前の見出し、注記は表の直後の「※」行、ファイル名は表の直後の「画像ファイル：」行から取ります。文字を直すときは、閉じてプレビューの表を書き換えてください。Google Drive に保存するときは「Drive設定」で保存先フォルダを選びます。</p>
+    <p class="dlg-hint" style="padding: 8px 14px 0;">プレビューの表を、記事用の見た目（幅1200px以内）で画像にします。表題は直前の見出し、注記は表の直後の「※」行、ファイル名は表の直後の「画像ファイル：」行から取ります。文字を直すときは、閉じてプレビューの表を書き換えてください。Google Drive に保存するときは「設定」でフォルダを指定します。</p>
     <div class="dlg-stage"><div id="tpng-sheet"></div></div>
   </div>
 </div>
@@ -595,7 +595,7 @@
 <!-- Google Drive 設定 -->
 <div id="gd-dlg" class="dlg no-print" hidden>
   <div class="dlg-panel narrow" role="dialog" aria-label="Google Drive 設定">
-    <div class="dlg-bar"><strong>Google Drive 設定</strong><span class="spacer"></span><button type="button" id="gd-close">閉じる</button></div>
+    <div class="dlg-bar"><strong>接続の設定（Google Drive）</strong><span class="spacer"></span><button type="button" id="gd-close">閉じる</button></div>
     <div class="dlg-body">
       <div class="row"><span class="lbl">クライアントID</span><input type="text" id="gd-client" class="wide" spellcheck="false" placeholder="xxxxxxxx.apps.googleusercontent.com"></div>
       <div class="row"><span class="lbl">APIキー</span><input type="text" id="gd-key" class="wide" spellcheck="false" placeholder="AIza..."></div>
@@ -1536,7 +1536,7 @@ function greet(name) {
   function requireDrive() {
     if (driveReady()) return Promise.resolve();
     openDriveSettings();
-    return Promise.reject(new Error('Google Drive を使うには「Drive設定」でクライアントIDとAPIキーを入れてください'));
+    return Promise.reject(new Error('Google Drive を使うには「設定」の「接続の設定」でクライアントIDとAPIキーを入れてください'));
   }
   function ensureGsi() {
     if (window.google && window.google.accounts && window.google.accounts.oauth2) return Promise.resolve();
@@ -2490,10 +2490,10 @@ function greet(name) {
       var e = document.createElement('li');
       e.className = 'empty';
       e.textContent = lib.files.length ? '一致するファイルがありません'
-        : !driveReady() ? '「Drive設定」でクライアントIDとAPIキーを入れてください'
+        : !driveReady() ? '「設定」の「接続の設定」でクライアントIDとAPIキーを入れてください'
         : !driveCfg.folderId ? '「設定」でフォルダ（URL）を指定してください'
         : !lib.loaded ? 'Google Drive に接続してください'
-        : (driveCfg.scope === 'full' ? 'このフォルダに .md がありません' : 'このフォルダに、このツールから見える .md がありません（「ファイルを追加」で加えるか、Drive設定で権限を drive にする）');
+        : (driveCfg.scope === 'full' ? 'このフォルダに .md がありません' : 'このフォルダに、このツールから見える .md がありません（「ファイルを追加」で加えるか、「設定」の「接続の設定」で権限を drive にする）');
       libListEl.appendChild(e);
     }
   }
