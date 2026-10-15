@@ -217,6 +217,7 @@
   .edit-bar { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; padding: 6px 12px; }
   .edit-bar .grp { display: inline-flex; gap: 2px; align-items: center; padding-right: 6px; margin-right: 2px; border-right: 1px solid var(--border); }
   .edit-bar .grp:last-of-type { border-right: 0; }
+  .edit-bar .grp[hidden] { display: none; }
   .edit-bar button, .edit-bar select { font-size: 12px; padding: 3px 8px; }
   .edit-bar button.b { font-weight: 700; }
   .edit-bar button.i { font-style: italic; }
@@ -235,6 +236,57 @@
     main.md-hidden { grid-template-rows: 1fr; }
     main.md-hidden.lib-open { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
     .edit-bar .hint { display: none; }
+  }
+
+  /* ---------- 追加分（第5版）: 役割・名簿・提案モード（赤字）・日付付きファイル ---------- */
+  main { position: relative; }
+  .gate { position: absolute; inset: 0; z-index: 40; background: rgba(243, 244, 246, .92); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .gate[hidden] { display: none; }
+  .gate-box { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; max-width: 480px; text-align: center; box-shadow: 0 8px 32px rgba(0, 0, 0, .15); }
+  .gate-box p { margin: 0 0 12px; font-size: 14px; line-height: 1.7; }
+  .role-badge { font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .role-badge[hidden] { display: none; }
+  .role-badge.master { border-color: var(--accent); color: var(--accent); }
+  .role-badge.client { border-color: #c1121f; color: #c1121f; }
+  #lib-drive { font-size: 12px; padding: 3px 6px; max-width: 100%; flex: 1; min-width: 0; }
+  #lib-drive[hidden] { display: none; }
+  #lib-drive:not([hidden]) + #lib-name { display: none; }
+  .tm-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .tm-table th, .tm-table td { border-bottom: 1px solid var(--border); padding: 4px 6px; text-align: left; }
+  .tm-table td.em { word-break: break-all; }
+  .tm-table select, .tm-table button { font-size: 12px; padding: 2px 6px; }
+  .tm-table td.empty { color: var(--muted); }
+  .tm-table td.dr { font-size: 11px; }
+  .tm-table td.dr label { display: inline-flex; align-items: center; gap: 2px; margin-right: 6px; font-size: 11px; color: var(--text); }
+  .tm-table td.dr .all { color: var(--muted); }
+  .tm-list { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+  .tm-list li { display: flex; gap: 8px; align-items: center; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+  .tm-list li .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tm-list li .id { color: var(--muted); font-size: 11px; }
+  .tm-list li.empty { color: var(--muted); }
+  .tm-list li button { font-size: 11px; padding: 2px 6px; }
+  #tm-email { width: 16em; } #tm-name { width: 12em; }
+  /* クライアントの変更: 追記は赤字、削除は赤の取り消し線（印刷・PDFにもそのまま出る） */
+  .markdown-body ins[data-u] { color: #c1121f; text-decoration: none; background: #fff1f1; border-bottom: 1px solid #c1121f; }
+  .markdown-body del[data-u] { color: #c1121f; text-decoration: line-through; background: #fff1f1; }
+  .markdown-body ins[data-u].rv-cur, .markdown-body del[data-u].rv-cur { outline: 2px solid #c1121f; outline-offset: 1px; }
+  body[data-role="master"] #preview ins[data-u], body[data-role="master"] #preview del[data-u] { cursor: pointer; }
+  .rv-pop {
+    position: absolute; z-index: 6; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+    background: var(--panel); color: var(--text); border: 1px solid #c1121f; border-radius: 6px; padding: 6px 8px; font-size: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .2); max-width: 360px;
+  }
+  .rv-pop[hidden] { display: none; }
+  .rv-pop button { font-size: 12px; padding: 3px 8px; }
+  .rv-count { font-size: 12px; color: #c1121f; }
+  /* クライアント: 書式ボタン・浮きボタン・履歴は出さない */
+  body[data-role="client"] #edit-bar, body[data-role="client"] #tpng-fab, body[data-role="client"] #img-fab,
+  body[data-role="client"] .lib-versions, body[data-role="client"] #lib-new, body[data-role="client"] #lib-pick,
+  body[data-role="client"] #lib-add-drive { display: none !important; }
+  body[data-role="client"] #preview [data-md] { cursor: default; }
+  body[data-role="client"] #preview [data-md]:hover { outline: none; }
+  @media print {
+    .markdown-body ins[data-u], .markdown-body del[data-u] { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 
   /* ---------- 追加分: ダイアログ・浮きボタン・表PNG・画像差し替え ---------- */
@@ -341,6 +393,8 @@
   </label>
   <span class="spacer"></span>
   <span id="status">準備中...</span>
+  <span id="role-badge" class="role-badge" hidden></span>
+  <button type="button" id="btn-users" hidden title="設定: ユーザーの登録・役割、ドライブ（Google Drive のフォルダ）、接続（マスターだけ）">設定</button>
   <button type="button" id="btn-drive-settings" title="Google Drive の接続設定">Drive設定</button>
   <button type="button" id="btn-print" title="ブラウザの印刷から「PDFに保存」（文字を選択できるPDF）">PDF出力（印刷）</button>
   <input type="file" id="file-input" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
@@ -355,6 +409,7 @@
       <button type="button" id="lib-reload" title="一覧を読み直す（他の人の更新を取り込む）">再読込</button>
     </div>
     <div class="lib-sub">
+      <select id="lib-drive" hidden title="ドライブ（記事のフォルダ）を切り替える"></select>
       <span id="lib-name" class="lib-name">（フォルダ未選択）</span>
       <a id="lib-folder-link" href="#" target="_blank" rel="noopener" hidden>Driveで開く</a>
       <button type="button" id="lib-add-drive" hidden title="Drive のファイルを選んで一覧に加える（drive.file の権限のとき）">ファイルを追加</button>
@@ -424,15 +479,67 @@
           <option value="page-break">改ページ</option>
         </select>
       </span>
+      <span class="grp" id="rv-grp" hidden>
+        <span class="rv-count">クライアントの変更 <b id="rv-count">0</b>件</span>
+        <button type="button" id="rv-next" title="次の変更へ移動">次へ</button>
+        <button type="button" id="rv-accept-all" title="すべての追記を本文にし、すべての削除を消す">すべて採用</button>
+        <button type="button" id="rv-reject-all" title="すべての追記を消し、すべての削除を元に戻す">すべて却下</button>
+      </span>
       <span class="hint">数式・図・目次はクリックで編集。保存（Update／書き出し）のときに Markdown に変換します</span>
     </div>
     <div class="preview-wrap">
       <article id="preview" class="markdown-body" contenteditable="true" aria-label="プレビュー"></article>
       <button type="button" id="tpng-fab" class="fab no-print" hidden>この表をPNG保存</button>
       <button type="button" id="img-fab" class="fab no-print" hidden>この画像を差し替え</button>
+      <div id="rv-pop" class="rv-pop no-print" hidden>
+        <span id="rv-info"></span>
+        <button type="button" id="rv-accept" class="primary">採用</button>
+        <button type="button" id="rv-reject">却下</button>
+        <button type="button" id="rv-close">閉じる</button>
+      </div>
     </div>
   </section>
+  <div id="gate" class="gate no-print" hidden>
+    <div class="gate-box">
+      <p id="gate-msg">Google Drive に接続すると文書を開けます</p>
+      <button type="button" id="gate-connect" class="primary">Google Drive に接続</button>
+    </div>
+  </div>
 </main>
+
+<!-- 設定（マスターだけ。第5版）: 接続・ドライブ・ユーザー -->
+<div id="tm-dlg" class="dlg no-print" hidden>
+  <div class="dlg-panel narrow" role="dialog" aria-label="設定">
+    <div class="dlg-bar"><strong>設定（マスター）</strong><span class="spacer"></span><button type="button" id="tm-close">閉じる</button></div>
+    <div class="dlg-body">
+      <div class="row"><span class="lbl">接続</span><span class="muted">ルートフォルダ（名簿 md2pdf-team.json の置き場所）: <span id="tm-root">（未設定）</span></span><button type="button" id="tm-conn">接続の設定（クライアントID・APIキー・ルートフォルダ）</button></div>
+
+      <div class="row"><span class="lbl">ドライブ</span><span class="muted">記事（.md）を置く Google Drive のフォルダ。直下の .md を一覧に出します。フォルダの URL を貼って追加できます。</span></div>
+      <ul id="tm-drives" class="tm-list"></ul>
+      <div class="row">
+        <input type="text" id="tm-drive-url" class="wide" placeholder="https://drive.google.com/drive/folders/XXXXXXXX（フォルダの URL または ID）" spellcheck="false" autocomplete="off">
+        <button type="button" id="tm-drive-url-add">URLで追加</button>
+        <button type="button" id="tm-drive-add">フォルダを選ぶ</button>
+      </div>
+
+      <div class="row"><span class="lbl">ユーザー</span><span class="muted">名簿に無い Google アカウントは接続できません。クライアントは担当のドライブだけを見て直せます（ドライブ単位で指定）。</span></div>
+      <table class="tm-table"><thead><tr><th>メールアドレス</th><th>名前</th><th>役割</th><th>ドライブ</th><th></th></tr></thead><tbody id="tm-users"></tbody></table>
+      <div class="row">
+        <input type="text" id="tm-email" placeholder="メールアドレス" spellcheck="false" autocomplete="off">
+        <input type="text" id="tm-name" placeholder="名前（赤字の変更に付く名前）" autocomplete="off">
+        <select id="tm-role">
+          <option value="user">ユーザー</option>
+          <option value="client">クライアント</option>
+          <option value="master">マスター</option>
+        </select>
+        <button type="button" id="tm-add">追加</button>
+      </div>
+      <label><input type="checkbox" id="tm-share" checked> Google Drive の共有も合わせて設定する（ユーザー: ルート閲覧＋全ドライブ編集、クライアント: ルート閲覧＋担当ドライブ編集。外した分は共有を解除。相手に Google から通知メールが届きます）</label>
+      <p class="dlg-hint">役割: マスター＝すべての操作（この画面、クライアントの変更の採用／却下を含む）。ユーザー＝記事の編集・Update・Rollback・書き出し（全ドライブ）。クライアント＝担当ドライブの記事に、文字の追記（赤字）と削除（赤の取り消し線）を提案して保存するだけ。最初のマスターは md2pdf-config.json の masters に書きます。名簿の変更は、相手が次に接続したときから効きます。</p>
+      <div class="row right"><span id="tm-state" class="muted"></span><button type="button" id="tm-save" class="primary">保存</button></div>
+    </div>
+  </div>
+</div>
 
 <!-- 表をPNG保存 -->
 <div id="tpng" class="dlg no-print" hidden>
@@ -1042,6 +1149,7 @@ function greet(name) {
     renderToc(pvEl);
     renderMermaid(pvEl);
     resolveLibImages(pvEl);
+    rvRefresh();
   }
 
   /* ---------- helpers ---------- */
@@ -1271,7 +1379,7 @@ function greet(name) {
           setStatus((job.mime === 'application/pdf' ? 'PDFを生成中...' : 'Markdownを保存中...'));
           return job.make().then(function (blob) {
             if (dest === 'drive') {
-              return driveUpload(job.name, blob, job.mime, driveCfg.folderId).then(function (r) { saved.push(job.name + (r && r.updated ? '（上書き）' : '')); });
+              return driveUpload(job.name, blob, job.mime, libFolderId()).then(function (r) { saved.push(job.name + (r && r.updated ? '（上書き）' : '')); });
             }
             downloadBlob(blob, job.name);
             saved.push(job.name);
@@ -1487,7 +1595,7 @@ function greet(name) {
           view = new gp.DocsView(gp.ViewId.FOLDERS).setIncludeFolders(true).setSelectFolderEnabled(true).setMimeTypes('application/vnd.google-apps.folder');
         } else if (kind === 'image') {
           view = new gp.DocsView(gp.ViewId.DOCS_IMAGES).setIncludeFolders(true);
-          if (driveCfg.folderId && view.setParent) view.setParent(driveCfg.folderId);
+          if (libFolderId() && view.setParent) view.setParent(libFolderId());
         } else {
           view = new gp.DocsView(gp.ViewId.DOCS).setIncludeFolders(true);
         }
@@ -1847,7 +1955,7 @@ function greet(name) {
       opt.textContent = info.title.length > 36 ? info.title.slice(0, 36) + '…' : info.title;
       tpngSelect.appendChild(opt);
     });
-    var canDrive = driveReady() && !!driveCfg.folderId;
+    var canDrive = driveReady() && !!libFolderId();
     var dr = document.querySelector('input[name="tpng-dest"][value="' + (canDrive ? 'drive' : 'local') + '"]');
     if (dr) dr.checked = true;
     tpngEl.hidden = false;
@@ -1904,7 +2012,7 @@ function greet(name) {
     return elementToPng(tpngSheet.firstChild).then(function (blob) {
       if (dest === 'drive') {
         // 一覧のフォルダの images/ に入れる（記事の画像リンク版と同じ置き場所）
-        return driveEnsureSubfolder(driveCfg.folderId, 'images').then(function (imgFolderId) {
+        return driveEnsureSubfolder(libFolderId(), 'images').then(function (imgFolderId) {
           return driveUpload(fname, blob, 'image/png', imgFolderId);
         }).then(function () {
           forgetImage('images/' + fname);
@@ -2137,6 +2245,7 @@ function greet(name) {
   function closeAnyDialog() {
     var closed = false;
     if (!atomDlg.hidden) { closeAtomDlg(); closed = true; }
+    else if (!tmDlg.hidden) { closeTeamDlg(); closed = true; }
     else if (!imgDlg.hidden) { closeImgDlg(); closed = true; }
     else if (!gdDlg.hidden) { closeDriveSettings(); closed = true; }
     else if (!saveDlg.hidden) { closeSaveDlg(); closed = true; }
@@ -2255,7 +2364,7 @@ function greet(name) {
       .then(function (r) { return r.text(); });
   }
   function driveCreateText(name, text) {
-    return driveUpload(name, new Blob([text], { type: 'text/markdown;charset=utf-8' }), 'text/markdown', driveCfg.folderId)
+    return driveUpload(name, new Blob([text], { type: 'text/markdown;charset=utf-8' }), 'text/markdown', libFolderId())
       .then(function (j) { return driveFileMeta(j.id).catch(function () { return { id: j.id, name: name }; }); });
   }
   function driveFindChild(parentId, name, isFolder) {
@@ -2283,7 +2392,7 @@ function greet(name) {
   }
   function driveReadBinary(path) {
     var parts = path.split('/').filter(function (s) { return s && s !== '.'; });
-    var p = Promise.resolve(driveCfg.folderId);
+    var p = Promise.resolve(libFolderId());
     parts.slice(0, -1).forEach(function (seg) {
       p = p.then(function (pid) { return driveFindChild(pid, seg, true); });
     });
@@ -2298,7 +2407,7 @@ function greet(name) {
 
   // 一覧のフォルダにある画像（images/xxx.png などの相対パス）をプレビューで表示する。Markdown のパスはそのまま
   function resolveLibImages(root) {
-    if (!driveCfg.folderId || !libConnectedNow()) return;
+    if (!libFolderId() || !libConnectedNow()) return;
     Array.prototype.forEach.call(root.querySelectorAll('img'), function (img) {
       var src = img.getAttribute('src') || '';
       if (!src || /^(data:|blob:|https?:|\/\/)/i.test(src) || img.hasAttribute('data-src')) return;
@@ -2334,18 +2443,21 @@ function greet(name) {
     var q = (libFilterEl.value || '').trim().toLowerCase();
     libListEl.innerHTML = '';
     var shown = 0;
-    lib.files.forEach(function (f) {
-      if (q && f.name.toLowerCase().indexOf(q) < 0) return;
+    // 第5版: タイトルごとに、日付（_yyyymmdd）が最新のファイルだけを出す
+    libGroups().forEach(function (g) {
+      var f = g.newest;
+      if (q && g.title.toLowerCase().indexOf(q) < 0 && f.name.toLowerCase().indexOf(q) < 0) return;
       var li = document.createElement('li');
       li.setAttribute('data-name', f.name);
       li.setAttribute('data-id', f.id);
-      if (lib.current && lib.current.id === f.id) li.className = 'sel' + (isDirty() ? ' dirty' : '');
+      if (lib.current && g.files.some(function (x) { return x.id === lib.current.id; })) li.className = 'sel' + (isDirty() ? ' dirty' : '');
       var fn = document.createElement('span');
       fn.className = 'fn';
-      fn.textContent = f.name;
+      fn.textContent = g.title;
       var meta = document.createElement('span');
       meta.className = 'meta';
-      meta.textContent = (f.modifiedTime ? fmtTime(f.modifiedTime) : '') + (f.lastModifiedBy ? '　' + f.lastModifiedBy : '') + (f.size !== undefined && f.size !== null ? '　' + fmtSize(f.size) : '');
+      meta.textContent = (fileDate(f.name) ? fmtDate8(fileDate(f.name)) + '版' : (f.modifiedTime ? fmtTime(f.modifiedTime) : '')) +
+        (g.files.length > 1 ? '（' + g.files.length + '版）' : '') + (f.lastModifiedBy ? '　' + f.lastModifiedBy : '') + (f.size !== undefined && f.size !== null ? '　' + fmtSize(f.size) : '');
       if (f.webViewLink) {
         var a = document.createElement('a');
         a.href = f.webViewLink;
@@ -2389,7 +2501,7 @@ function greet(name) {
       var m = document.createElement('span');
       m.className = 'vmeta';
       var t1 = document.createElement('span');
-      t1.textContent = (i === 0 ? '1つ前　' : (i + 1) + 'つ前　') + fmtTime(v.time);
+      t1.textContent = (i === 0 ? '1つ前　' : (i + 1) + 'つ前　') + (v.label || fmtTime(v.time));
       var t2 = document.createElement('span');
       t2.className = 'vsub';
       t2.textContent = (v.by ? v.by + '　' : '') + (v.size !== undefined ? fmtSize(v.size) : '');
@@ -2448,8 +2560,8 @@ function greet(name) {
     if (!cur) return Promise.resolve();
     return driveRevisions(cur).then(function (revs) {
       if (!lib.current || lib.current.id !== cur.id) return;
-      // 先頭は今の内容なので、戻せる「前の版」はそれ以降
-      lib.versions = revs.slice(1);
+      // 先頭は今の内容なので、戻せる「前の版」はそれ以降。第5版: 古い日付のファイル（タイトル_yyyymmdd）も「前の版」に並べる
+      lib.versions = libMergeVersions(cur, revs.slice(1));
       libRenderVersions();
       libRefreshButtons();
     }).catch(function (e) {
@@ -2461,10 +2573,10 @@ function greet(name) {
     });
   }
   function libReload(quiet) {
-    if (!driveReady() || !driveCfg.folderId) { lib.files = []; lib.loaded = false; libRenderList(); libRefreshButtons(); return Promise.resolve(); }
+    if (!driveReady() || !libFolderId()) { lib.files = []; lib.loaded = false; libRenderList(); libRefreshButtons(); return Promise.resolve(); }
     if (!quiet) setStatus('一覧を読み込み中...');
     lib.loading = true;
-    return driveListFolder(driveCfg.folderId).then(function (files) {
+    return driveListFolder(libFolderId()).then(function (files) {
       lib.loading = false;
       files.sort(function (a, b) { return a.name.localeCompare(b.name, 'ja'); });
       lib.files = files;
@@ -2522,15 +2634,12 @@ function greet(name) {
     var text = mdEl.value;
     btnUpdate.disabled = true;
     setStatus('Update 中: ' + cur.name);
-    return checkConflict(cur).then(function (meta) {
-      if (!meta) { setStatus('Update をやめました（一覧から開き直すと最新の内容を確認できます）'); return; }
-      return driveWriteText(cur, text).then(function (newMeta) {
-        lib.current = newMeta.id ? newMeta : cur;
-        lib.loadedText = text;
-        persistCurrent();
-        return Promise.all([libLoadVersions(), libReload(true)]).then(function () {
-          setStatus('Update しました: ' + cur.name + '（前の内容は履歴に残しました）');
-        });
+    // 第5版: 今日の日付のファイル（タイトル_yyyymmdd.md）に保存する（同じ日は上書き、日が変われば新しいファイル）
+    return libWriteDated(cur, text).then(function (newMeta) {
+      if (!newMeta) { setStatus('Update をやめました（一覧から開き直すと最新の内容を確認できます）'); return; }
+      libAdopt(newMeta, text);
+      return libReload(true).then(libLoadVersions).then(function () {
+        setStatus('Update しました: ' + newMeta.name + '（前の内容は履歴に残しました）');
       });
     }).catch(function (e) {
       setStatus('Update できませんでした: ' + ((e && e.message) || e));
@@ -2543,18 +2652,15 @@ function greet(name) {
     if (!confirm('「' + cur.name + '」を ' + label + ' に戻しますか？\n今の内容も履歴に残るので、あとで戻せます。')) return Promise.resolve();
     btnRollback.disabled = true;
     setStatus('戻しています: ' + label);
-    return checkConflict(cur).then(function (meta) {
-      if (!meta) { setStatus('Rollback をやめました'); return; }
-      return driveReadRevision(cur, v).then(function (text) {
-        return driveWriteText(cur, text).then(function (newMeta) {
-          driveFileId = cur.id;
-          openText(text, cur.name);
-          lib.current = newMeta.id ? newMeta : cur;
-          lib.loadedText = text;
-          persistCurrent();
-          return Promise.all([libLoadVersions(), libReload(true)]).then(function () {
-            setStatus('Rollback しました: ' + cur.name + ' を ' + label + ' に戻しました');
-          });
+    // 第5版: 古い日付のファイルの内容、または当日の版の内容を、今日の日付のファイルとして書く
+    return (v.kind === 'file' ? driveReadText(v) : driveReadRevision(cur, v)).then(function (text) {
+      return libWriteDated(cur, text).then(function (newMeta) {
+        if (!newMeta) { setStatus('Rollback をやめました'); return; }
+        driveFileId = newMeta.id;
+        openText(text, newMeta.name);
+        libAdopt(newMeta, text);
+        return libReload(true).then(libLoadVersions).then(function () {
+          setStatus('Rollback しました: ' + newMeta.name + ' を ' + label + ' の内容に戻しました');
         });
       });
     }).catch(function (e) {
@@ -2566,12 +2672,13 @@ function greet(name) {
     libRestore(lib.versions[0], 0);
   }
   function libNewFile() {
-    if (!driveReady() || !driveCfg.folderId) { setStatus('先に Google Drive に接続して、チームのフォルダを選んでください'); return; }
+    if (!driveReady() || !libFolderId()) { setStatus('先に Google Drive に接続して、チームのフォルダを選んでください'); return; }
     var base = stripDateSuffix(getBaseName()) || 'document';
     var name = prompt('新しいファイルの名前（チームのフォルダに作ります）', base + '.md');
     if (!name) return;
     name = sanitizeFileName(name);
     if (!isTextName(name)) name += '.md';
+    name = fileTitle(name) + '_' + todayStamp() + '.md';   // 第5版: タイトル_yyyymmdd.md
     if (lib.files.some(function (f) { return f.name === name; }) && !confirm('同じ名前のファイルがあります。上書きしますか？')) return;
     flushAll();
     var text = mdEl.value;
@@ -2592,7 +2699,11 @@ function greet(name) {
   function onDriveToken() {
     libRefreshButtons();
     if (!lib.user) {
-      driveWhoAmI().then(function (u) { lib.user = u; libRefreshButtons(); });
+      // 第5版: 名前を取ったあとに名簿で役割を判定してから一覧を読む（名簿に無ければ接続を解除）
+      driveWhoAmI().then(function (u) { lib.user = u; libRefreshButtons(); return teamAfterLogin(); })
+        .then(function (ok) { if (ok) teamStart(); });
+    } else if (!teamMode || role) {
+      teamStart();
     }
     if (driveCfg.folderId && !driveCfg.folderLink) {
       // チーム設定（config.json）でフォルダが決まっているとき: 名前とリンクを補う
@@ -2603,9 +2714,11 @@ function greet(name) {
         refreshFolderLabels();
       }).catch(function () { /* ignore */ });
     }
-    if (driveCfg.folderId && !lib.loaded && !lib.loading) {
+  }
+  function teamStart() {
+    if (libFolderId() && !lib.loaded && !lib.loading) {
       libReload().then(restoreCurrent);
-    } else if (!driveCfg.folderId) {
+    } else if (!libFolderId()) {
       setStatus('接続しました。「フォルダ」でチームのフォルダを選んでください');
     }
   }
@@ -2716,6 +2829,7 @@ function greet(name) {
       });
       Object.keys(driveCfg).forEach(function (k) { if (driveCfg[k] !== undefined && driveCfg[k] !== '') merged[k] = driveCfg[k]; });
       driveCfg = merged;
+      teamSetMasters(cfg.masters);   // 第5版: 初期マスター（あればチームモード）
       refreshFolderLabels();
       libRefreshButtons();
     }).catch(function () { /* 無ければ何もしない */ });
@@ -2728,7 +2842,7 @@ function greet(name) {
     libSetOpen(open === '1');
     libRefreshButtons();
     libRenderList();
-    loadTeamConfig().then(function () { libRenderList(); });
+    loadTeamConfig().then(function () { libRenderList(); teamInit(); });
   })();
 
   /* ---------- 第4版: プレビュー（PDFの見た目）で編集する。Markdown は保存のときに作る ---------- */
@@ -2771,6 +2885,16 @@ function greet(name) {
       var n = br.nextSibling;
       while (n && n.nodeType === 3 && !n.nodeValue.trim()) n = n.nextSibling;
       if (!n && !br.closest('[data-md]')) br.parentNode.removeChild(br);
+    });
+    // 赤字の追記の末尾に残った改行（Enter を押しただけ）は落とす。空になった追記は除く
+    Array.prototype.forEach.call(c.querySelectorAll('ins[data-u]'), function (ins) {
+      var after = ins.nextSibling;
+      while (after && after.nodeType === 3 && !after.nodeValue.trim()) after = after.nextSibling;
+      if (!after) { while (ins.lastChild && ins.lastChild.nodeName === 'BR') ins.removeChild(ins.lastChild); }
+      if (!ins.textContent.replace(/​/g, '') && !ins.querySelector('br, img')) ins.parentNode.removeChild(ins);
+    });
+    Array.prototype.forEach.call(c.querySelectorAll('del[data-u]'), function (del) {
+      if (!del.textContent.replace(/​/g, '') && !del.querySelector('br, img')) del.parentNode.removeChild(del);
     });
     // 中身のない箇条書きの項目（Enter を押しただけの行）は除く
     Array.prototype.forEach.call(c.querySelectorAll('li'), function (li) {
@@ -3214,6 +3338,825 @@ function greet(name) {
     e.preventDefault();
     openAtomDlg(el);
   });
+
+  /* ---------- 第5版: 役割（マスター／ユーザー／クライアント）・名簿・ドライブ・日付付きファイル・提案モード ---------- */
+  var TEAM_FILE = 'md2pdf-team.json';
+  var DRIVE_SEL_KEY = 'md2pdf:drive:sel';
+  var team = { users: [], drives: [], fileId: '', loaded: false };
+  var teamMasters = [];   // md2pdf-config.json の masters（小文字）。あればチームモード（名簿に無いアカウントは接続できない）
+  var teamMode = false;
+  var role = '';          // 'master' | 'user' | 'client' | ''（未判定）
+  var gateEl = document.getElementById('gate');
+  var gateMsgEl = document.getElementById('gate-msg');
+  var roleBadge = document.getElementById('role-badge');
+  var libDriveEl = document.getElementById('lib-drive');
+  var tmDlg = document.getElementById('tm-dlg');
+
+  function lowerMail(s) { return String(s || '').trim().toLowerCase(); }
+  function teamSetMasters(list) {
+    teamMasters = Array.isArray(list) ? list.map(lowerMail).filter(Boolean) : [];
+    teamMode = teamMasters.length > 0;
+    if (teamMode && !role) { applyRole(); gateShow('Google Drive に接続すると文書を開けます（登録されたアカウントだけが使えます）'); }
+  }
+  function gateShow(msg) {
+    gateMsgEl.textContent = msg;
+    gateEl.hidden = false;
+    document.getElementById('gate-connect').disabled = false;
+  }
+  function gateHide() { gateEl.hidden = true; }
+  document.getElementById('gate-connect').addEventListener('click', function () {
+    if (!driveReady()) { gateShow('md2pdf-config.json にクライアントIDとAPIキーがありません。管理者（マスター）に確認してください'); if (teamMasters.length) openDriveSettings(); return; }
+    this.disabled = true;
+    libConnect();
+  });
+
+  /* --- 名簿（md2pdf-team.json。ルートフォルダに置く） --- */
+  function teamLoad() {
+    team.loaded = false;
+    if (!driveCfg.folderId) return Promise.reject(new Error('ルートフォルダが未設定です（md2pdf-config.json の folderId）'));
+    return driveFindInFolder(TEAM_FILE, driveCfg.folderId).then(function (id) {
+      if (!id) { team.users = []; team.drives = []; team.fileId = ''; team.loaded = true; return; }
+      team.fileId = id;
+      return driveDownload(id).then(function (b) { return b.text(); }).then(function (t) {
+        var j = {};
+        try { j = JSON.parse(t) || {}; } catch (e) { j = {}; }
+        team.users = Array.isArray(j.users) ? j.users.filter(function (u) { return u && u.email; }).map(function (u) {
+          return { email: lowerMail(u.email), name: String(u.name || ''), role: /^(master|user|client)$/.test(u.role) ? u.role : 'user',
+            drives: Array.isArray(u.drives) ? u.drives.map(String) : [] };   // クライアントの担当ドライブ（ドライブ単位）
+        }) : [];
+        team.drives = Array.isArray(j.drives) ? j.drives.filter(function (d) { return d && d.id; }).map(function (d) { return { id: String(d.id), name: String(d.name || d.id) }; }) : [];
+        team.loaded = true;
+      });
+    });
+  }
+  function teamSave() {
+    var body = JSON.stringify({ users: team.users, drives: team.drives, updatedAt: new Date().toISOString(), updatedBy: myName() }, null, 2);
+    return driveUpload(TEAM_FILE, new Blob([body], { type: 'application/json' }), 'application/json', driveCfg.folderId)
+      .then(function (j) { if (j && j.id) team.fileId = j.id; });
+  }
+  function teamRoleOf(email) {
+    email = lowerMail(email);
+    if (!email) return '';
+    if (teamMasters.indexOf(email) >= 0) return 'master';
+    var u = team.users.filter(function (x) { return x.email === email; })[0];
+    return u ? u.role : '';
+  }
+  function teamUserByMail(email) { return team.users.filter(function (x) { return x.email === lowerMail(email); })[0] || null; }
+  // 自分が見てよいドライブ。クライアントは担当のドライブだけ
+  function teamMyDrives() {
+    if (!team || !team.drives.length) return [];
+    if (role !== 'client') return team.drives;
+    var me = lib.user ? teamUserByMail(lib.user.emailAddress) : null;
+    var ids = (me && me.drives) || [];
+    return team.drives.filter(function (d) { return ids.indexOf(d.id) >= 0; });
+  }
+  // Google Drive のフォルダの URL（または ID）からフォルダ ID を取り出す
+  function driveIdFromUrl(s) {
+    s = String(s || '').trim();
+    var m = /\/folders\/([A-Za-z0-9_-]+)/.exec(s) || /[?&]id=([A-Za-z0-9_-]+)/.exec(s) || /\/d\/([A-Za-z0-9_-]+)/.exec(s);
+    if (m) return m[1];
+    return /^[A-Za-z0-9_-]{2,}$/.test(s) ? s : '';
+  }
+  function myName() {
+    var u = lib.user ? teamUserByMail(lib.user.emailAddress) : null;
+    return (u && u.name) || (lib.user && (lib.user.displayName || (lib.user.emailAddress || '').split('@')[0])) || 'user';
+  }
+
+  // ログイン後: 役割を決める。名簿に無ければ接続を解除して断る
+  function teamInit() {
+    // 名簿を使わない（md2pdf-config.json に masters が無い）ときは、今までどおり制限なし＝マスター扱い
+    if (!teamMode && !role) { role = 'master'; applyRole(); }
+  }
+  function teamAfterLogin() {
+    if (!teamMode) { role = 'master'; applyRole(); gateHide(); return Promise.resolve(true); }
+    return teamLoad().then(function () {
+      role = teamRoleOf(lib.user && lib.user.emailAddress);
+      if (!role) {
+        var mail = (lib.user && lib.user.emailAddress) || '';
+        teamDeny('このアカウント（' + mail + '）は登録されていません。管理者（マスター）に登録を依頼してください');
+        return false;
+      }
+      applyRole();
+      gateHide();
+      teamRenderDrives();
+      setStatus('接続しました（' + ROLE_LABEL[role] + '）');
+      return true;
+    }, function (e) {
+      teamDeny('名簿（' + TEAM_FILE + '）を読めませんでした: ' + ((e && e.message) || e));
+      return false;
+    });
+  }
+  function teamDeny(msg) {
+    role = '';
+    lib.user = null;
+    driveSignOut();
+    lib.files = []; lib.loaded = false;
+    libSelect(null);
+    libRenderList();
+    applyRole();
+    gateShow(msg);
+    setStatus(msg);
+  }
+
+  /* --- 役割ごとの画面 --- */
+  var ROLE_LABEL = { master: 'マスター', user: 'ユーザー', client: 'クライアント（提案モード）' };
+  var ROLE_HIDE = {
+    master: [],
+    user: ['#btn-users', '#lib-pick', '#rv-grp'],
+    client: ['#btn-users', '#btn-new', '#btn-open', '#btn-open-drive', '#btn-rollback', '#btn-table-png', '#btn-md-pane', '#btn-drive-settings', '#lib-pick', '#lib-new', '#lib-add-drive', '#rv-grp']
+  };
+  function applyRole() {
+    document.body.setAttribute('data-role', role || '');
+    var all = {};
+    Object.keys(ROLE_HIDE).forEach(function (k) { ROLE_HIDE[k].forEach(function (sel) { all[sel] = true; }); });
+    Object.keys(all).forEach(function (sel) {
+      var el = document.querySelector(sel);
+      if (!el) return;
+      var hide = role ? ROLE_HIDE[role].indexOf(sel) >= 0 : (teamMode && sel !== '#btn-drive-settings');
+      if (sel === '#btn-users') hide = !(role === 'master' && teamMode);
+      if (sel === '#rv-grp') { el.hidden = role !== 'master' || !rvMarks().length; return; }
+      if (sel === '#lib-add-drive') { if (hide) el.hidden = true; return; }   // 出すかどうかは libRefreshButtons が決める
+      el.hidden = hide;
+    });
+    roleBadge.hidden = !role || !teamMode;
+    roleBadge.textContent = role ? ROLE_LABEL[role] + (lib.user ? '　' + myName() : '') : '';
+    roleBadge.className = 'role-badge ' + (role || '');
+    if (role === 'client' && mdPaneOpen()) setMdPane(false);
+    rvRefresh();
+  }
+  function clientMode() { return role === 'client'; }
+  // クライアントは、ローカルのファイルを落として開くこともできない
+  window.addEventListener('drop', function (e) {
+    if (clientMode()) { e.preventDefault(); e.stopImmediatePropagation(); setStatus('提案モードではファイルを開けません'); }
+  }, true);
+
+  /* --- ドライブ（記事のフォルダ）の切り替え --- */
+  function teamDriveSel() {
+    var mine = teamMyDrives();
+    if (!mine.length) return '';
+    var id = '';
+    try { id = localStorage.getItem(DRIVE_SEL_KEY) || ''; } catch (e) { /* ignore */ }
+    return mine.some(function (d) { return d.id === id; }) ? id : mine[0].id;
+  }
+  function libFolderId() {
+    if (teamMode && role === 'client') return teamDriveSel();   // クライアントは担当ドライブだけ（無ければ何も見えない）
+    return teamDriveSel() || driveCfg.folderId;
+  }
+  function teamRenderDrives() {
+    libDriveEl.innerHTML = '';
+    var mine = teamMyDrives();
+    if (!mine.length) {
+      libDriveEl.hidden = true;
+      if (teamMode && role === 'client') document.getElementById('lib-name').textContent = '担当のドライブがありません（マスターに設定を依頼してください）';
+      return;
+    }
+    var sel = teamDriveSel();
+    mine.forEach(function (d) {
+      var o = document.createElement('option');
+      o.value = d.id;
+      o.textContent = d.name;
+      if (d.id === sel) o.selected = true;
+      libDriveEl.appendChild(o);
+    });
+    libDriveEl.hidden = false;
+    var ln = document.getElementById('lib-name');
+    ln.textContent = '';
+  }
+  libDriveEl.addEventListener('change', function () {
+    if (isDirty() && !confirm('未保存の変更があります。破棄してドライブを切り替えますか？')) { teamRenderDrives(); return; }
+    try { localStorage.setItem(DRIVE_SEL_KEY, libDriveEl.value); } catch (e) { /* ignore */ }
+    libSelect(null);
+    lib.loaded = false;
+    clearImgCache();
+    libReload();
+  });
+
+  /* --- Google Drive の共有（マスターがユーザーを追加したとき） --- */
+  function driveShare(fileId, email, driveRole) {
+    return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '/permissions?supportsAllDrives=true&sendNotificationEmail=true&fields=id',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: driveRole, type: 'user', emailAddress: email }) });
+  }
+  function driveUnshare(fileId, email) {
+    return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '/permissions?supportsAllDrives=true&fields=permissions(id,emailAddress,role)&pageSize=100')
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var p = (j.permissions || []).filter(function (x) { return lowerMail(x.emailAddress) === lowerMail(email) && x.role !== 'owner'; });
+        return p.reduce(function (q, x) {
+          return q.then(function () {
+            return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '/permissions/' + encodeURIComponent(x.id) + '?supportsAllDrives=true', { method: 'DELETE' });
+          });
+        }, Promise.resolve());
+      });
+  }
+
+  /* --- ユーザーとドライブの管理（ダイアログ） --- */
+  var tmWork = null;   // { users: [], drives: [] } 編集中の控え
+  function openTeamDlg() {
+    if (role !== 'master') return;
+    tmWork = { users: team.users.map(function (u) { return { email: u.email, name: u.name, role: u.role, drives: (u.drives || []).slice() }; }), drives: team.drives.map(function (d) { return { id: d.id, name: d.name }; }) };
+    document.getElementById('tm-state').textContent = '';
+    document.getElementById('tm-root').textContent = driveCfg.folderId ? (driveCfg.folderName || driveCfg.folderId) : '（未設定）';
+    tmRender();
+    tmDlg.hidden = false;
+    document.getElementById('tm-drive-url').focus();
+  }
+  document.getElementById('tm-conn').addEventListener('click', function () { openDriveSettings(); });
+  function closeTeamDlg() { tmDlg.hidden = true; tmWork = null; }
+  function tmRender() {
+    var tb = document.getElementById('tm-users');
+    tb.innerHTML = '';
+    if (!tmWork.users.length) {
+      var tr0 = document.createElement('tr');
+      var td0 = document.createElement('td');
+      td0.colSpan = 5; td0.className = 'empty'; td0.textContent = 'まだ誰も登録されていません（md2pdf-config.json の masters は常にマスターです）';
+      tr0.appendChild(td0); tb.appendChild(tr0);
+    }
+    tmWork.users.forEach(function (u, i) {
+      var tr = document.createElement('tr');
+      var td1 = document.createElement('td'); td1.className = 'em'; td1.textContent = u.email;
+      var td2 = document.createElement('td');
+      var nm = document.createElement('input'); nm.type = 'text'; nm.value = u.name; nm.style.width = '9em';
+      nm.addEventListener('input', function () { u.name = nm.value; });
+      td2.appendChild(nm);
+      var td3 = document.createElement('td');
+      var sl = document.createElement('select');
+      [['user', 'ユーザー'], ['client', 'クライアント'], ['master', 'マスター']].forEach(function (p) {
+        var o = document.createElement('option'); o.value = p[0]; o.textContent = p[1]; if (u.role === p[0]) o.selected = true; sl.appendChild(o);
+      });
+      sl.addEventListener('change', function () { u.role = sl.value; tmRender(); });
+      td3.appendChild(sl);
+      // ドライブ: クライアントは担当のドライブを選ぶ（ドライブ単位）。ユーザー・マスターは全ドライブ
+      var tdD = document.createElement('td'); tdD.className = 'dr';
+      if (u.role === 'client') {
+        if (!tmWork.drives.length) { var na = document.createElement('span'); na.className = 'all'; na.textContent = '（ドライブを追加してください）'; tdD.appendChild(na); }
+        tmWork.drives.forEach(function (d) {
+          var lb = document.createElement('label');
+          var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = d.id; cb.checked = u.drives.indexOf(d.id) >= 0;
+          cb.addEventListener('change', function () {
+            u.drives = u.drives.filter(function (x) { return x !== d.id; });
+            if (cb.checked) u.drives.push(d.id);
+          });
+          lb.appendChild(cb); lb.appendChild(document.createTextNode(d.name));
+          tdD.appendChild(lb);
+        });
+      } else {
+        var al = document.createElement('span'); al.className = 'all'; al.textContent = 'すべて'; tdD.appendChild(al);
+      }
+      var td4 = document.createElement('td');
+      var del = document.createElement('button'); del.type = 'button'; del.textContent = '削除';
+      del.addEventListener('click', function () { tmWork.users.splice(i, 1); tmRender(); });
+      td4.appendChild(del);
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(tdD); tr.appendChild(td4);
+      tb.appendChild(tr);
+    });
+    var ul = document.getElementById('tm-drives');
+    ul.innerHTML = '';
+    if (!tmWork.drives.length) {
+      var li0 = document.createElement('li'); li0.className = 'empty';
+      li0.textContent = 'ドライブが無いときは、ルートフォルダ（' + (driveCfg.folderName || driveCfg.folderId || '未設定') + '）直下の .md を一覧に出します';
+      ul.appendChild(li0);
+    }
+    tmWork.drives.forEach(function (d, i) {
+      var li = document.createElement('li');
+      var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = d.name;
+      var id = document.createElement('span'); id.className = 'id'; id.textContent = d.id;
+      var del = document.createElement('button'); del.type = 'button'; del.textContent = '外す';
+      del.title = '一覧から外します（Drive の共有は変えません）';
+      del.addEventListener('click', function () { tmWork.drives.splice(i, 1); tmRender(); });
+      li.appendChild(nm); li.appendChild(id); li.appendChild(del);
+      ul.appendChild(li);
+    });
+  }
+  document.getElementById('tm-add').addEventListener('click', function () {
+    var email = lowerMail(document.getElementById('tm-email').value);
+    var name = document.getElementById('tm-name').value.trim();
+    var r = document.getElementById('tm-role').value;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { document.getElementById('tm-state').textContent = 'メールアドレスの形式を確認してください'; return; }
+    if (tmWork.users.some(function (u) { return u.email === email; })) { document.getElementById('tm-state').textContent = 'すでに登録されています: ' + email; return; }
+    tmWork.users.push({ email: email, name: name || email.split('@')[0], role: r, drives: r === 'client' ? tmWork.drives.map(function (d) { return d.id; }) : [] });
+    document.getElementById('tm-email').value = '';
+    document.getElementById('tm-name').value = '';
+    document.getElementById('tm-state').textContent = '';
+    tmRender();
+  });
+  document.getElementById('tm-email').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tm-add').click(); } });
+  function tmAddDrive(f) {
+    if (!f) return;
+    if (tmWork.drives.some(function (d) { return d.id === f.id; })) { document.getElementById('tm-state').textContent = 'すでに追加されています: ' + f.name; return; }
+    tmWork.drives.push({ id: f.id, name: f.name || f.id });
+    document.getElementById('tm-state').textContent = 'ドライブを追加しました: ' + (f.name || f.id) + '（「保存」で確定）';
+    tmRender();
+  }
+  document.getElementById('tm-drive-add').addEventListener('click', function () {
+    pickDrive('folder').then(tmAddDrive).catch(function (e) { document.getElementById('tm-state').textContent = (e && e.message) || String(e); });
+  });
+  // URL（または ID）で追加: フォルダかどうか・開けるかを確かめてから加える
+  document.getElementById('tm-drive-url-add').addEventListener('click', function () {
+    var st = document.getElementById('tm-state');
+    var inp = document.getElementById('tm-drive-url');
+    var id = driveIdFromUrl(inp.value);
+    if (!id) { st.textContent = 'フォルダの URL（https://drive.google.com/drive/folders/…）または ID を入れてください'; return; }
+    st.textContent = 'フォルダを確認中...';
+    driveGetMeta(id, 'id,name,mimeType').then(function (j) {
+      if (!j || !j.id) throw new Error('見つかりません');
+      if (j.mimeType !== 'application/vnd.google-apps.folder') throw new Error('フォルダではありません: ' + j.name);
+      inp.value = '';
+      tmAddDrive({ id: j.id, name: j.name });
+    }).catch(function (e) { st.textContent = 'このフォルダは追加できません（' + ((e && e.message) || e) + '）。URL と、あなたに閲覧権限があるかを確認してください'; });
+  });
+  document.getElementById('tm-drive-url').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tm-drive-url-add').click(); } });
+  // 共有の「あるべき状態」: ユーザー＝ルート閲覧＋全ドライブ編集、クライアント＝ルート閲覧＋担当ドライブ編集（マスターは自分で管理）
+  function teamDesired(users, drives) {
+    var out = {};
+    users.forEach(function (u) {
+      if (u.role === 'master') return;
+      if (driveCfg.folderId) out[driveCfg.folderId + '|' + u.email] = { file: driveCfg.folderId, email: u.email, role: 'reader', what: u.email + ' にルートを共有' };
+      var ids = u.role === 'client' ? (u.drives || []) : drives.map(function (d) { return d.id; });
+      drives.forEach(function (d) {
+        if (ids.indexOf(d.id) < 0) return;
+        out[d.id + '|' + u.email] = { file: d.id, email: u.email, role: 'writer', what: u.email + ' に「' + d.name + '」を共有' };
+      });
+    });
+    return out;
+  }
+  document.getElementById('tm-save').addEventListener('click', function () {
+    if (!tmWork) return;
+    var btn = this;
+    var st = document.getElementById('tm-state');
+    var share = document.getElementById('tm-share').checked;
+    var jobs = [];
+    if (share) {
+      // 前の「あるべき状態」と新しい「あるべき状態」の差分だけ共有・解除する
+      var before = teamDesired(team.users, team.drives);
+      var after = teamDesired(tmWork.users, tmWork.drives);
+      Object.keys(after).forEach(function (k) {
+        if (before[k] && before[k].role === after[k].role) return;
+        var p = after[k];
+        jobs.push({ what: p.what, run: function () { return driveShare(p.file, p.email, p.role); } });
+      });
+      Object.keys(before).forEach(function (k) {
+        if (after[k]) return;
+        var p = before[k];
+        jobs.push({ what: p.what.replace(/を共有$/, 'の共有を解除'), run: function () { return driveUnshare(p.file, p.email); } });
+      });
+    }
+    btn.disabled = true;
+    st.textContent = '名簿を保存中...';
+    team.users = tmWork.users;
+    team.drives = tmWork.drives;
+    var failed = [];
+    teamSave().then(function () {
+      return jobs.reduce(function (p, job, i) {
+        return p.then(function () {
+          st.textContent = '共有を設定中 ' + (i + 1) + '/' + jobs.length + ': ' + job.what;
+          return job.run().catch(function (e) { failed.push(job.what + '（' + ((e && e.message) || e) + '）'); });
+        });
+      }, Promise.resolve());
+    }).then(function () {
+      teamRenderDrives();
+      libRefreshButtons();
+      if (!tmWork.drives.some(function (d) { return d.id === teamDriveSel(); })) { lib.loaded = false; }
+      libReload(true);
+      st.textContent = failed.length ? '保存しました。共有できなかったもの: ' + failed.join('、') : '保存しました' + (jobs.length ? '（共有 ' + jobs.length + ' 件）' : '');
+      setStatus('名簿を保存しました');
+    }).catch(function (e) {
+      st.textContent = '保存できませんでした: ' + ((e && e.message) || e);
+    }).then(function () { btn.disabled = false; });
+  });
+  document.getElementById('tm-close').addEventListener('click', closeTeamDlg);
+  tmDlg.addEventListener('click', function (e) { if (e.target === tmDlg) closeTeamDlg(); });
+  document.getElementById('btn-users').addEventListener('click', openTeamDlg);
+
+  /* --- 日付付きファイル（タイトル_yyyymmdd.md）。同じタイトルは最新の日付を参照する --- */
+  function fileTitle(name) { return String(name || '').replace(/\.(md|markdown|txt)$/i, '').replace(/_\d{8}$/, ''); }
+  function fileDate(name) { var m = /_(\d{8})\.(md|markdown|txt)$/i.exec(String(name || '')); return m ? m[1] : ''; }
+  function fmtDate8(d) { return d ? d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8) : ''; }
+  function fileNewerThan(a, b) {
+    var da = fileDate(a.name), db = fileDate(b.name);
+    if (da !== db) return da > db;
+    return String(a.modifiedTime || '') > String(b.modifiedTime || '');
+  }
+  function libGroups() {
+    var map = {}, order = [];
+    lib.files.forEach(function (f) {
+      var t = fileTitle(f.name);
+      if (!map[t]) { map[t] = { title: t, files: [], newest: f }; order.push(t); }
+      map[t].files.push(f);
+      if (fileNewerThan(f, map[t].newest)) map[t].newest = f;
+    });
+    return order.map(function (t) {
+      map[t].files.sort(function (a, b) { return fileNewerThan(a, b) ? -1 : 1; });
+      return map[t];
+    });
+  }
+  function libMergeVersions(cur, revs) {
+    var title = fileTitle(cur.name);
+    var list = revs.map(function (v) { v.kind = 'rev'; v.label = fmtTime(v.time); return v; });
+    lib.files.forEach(function (f) {
+      if (f.id === cur.id || fileTitle(f.name) !== title) return;
+      if (fileDate(f.name) && fileDate(cur.name) && fileDate(f.name) > fileDate(cur.name)) return;   // 今より新しい日付は「前の版」ではない
+      list.push({ kind: 'file', id: f.id, name: f.name, time: new Date(f.modifiedTime || 0).getTime(), size: f.size, by: f.lastModifiedBy || '',
+        label: (fileDate(f.name) ? fmtDate8(fileDate(f.name)) + '版' : f.name) });
+    });
+    list.sort(function (a, b) { return b.time - a.time; });
+    return list;
+  }
+  // 今日の日付のファイルに書く。開いているのが今日のファイルならそのまま上書き（他の人の更新は確認）、違えば今日のファイルを作る（あれば確認して上書き）
+  function libWriteDated(cur, text) {
+    var name = fileTitle(cur.name) + '_' + todayStamp() + '.md';
+    if (cur.name === name) {
+      return checkConflict(cur).then(function (meta) { return meta ? driveWriteText(cur, text) : null; });
+    }
+    return checkConflict(cur).then(function (ok) {
+      // 開いていたファイルが他の人に更新されていれば、新しい日付のファイルを作る前にも知らせる
+      if (!ok) return null;
+      return driveFindInFolder(name, libFolderId()).then(function (existing) {
+        if (!existing) return driveCreateText(name, text);
+        return driveFileMeta(existing).then(function (meta) {
+          var ok2 = confirm('今日の版「' + name + '」はすでにあります。\n最終更新: ' + fmtTime(meta.modifiedTime) + (meta.lastModifiedBy ? '　' + meta.lastModifiedBy : '') +
+            '\n\n上書きしますか？（前の内容は履歴に残ります）');
+          return ok2 ? driveWriteText(meta, text) : null;
+        });
+      });
+    });
+  }
+  function libAdopt(meta, text) {
+    lib.current = meta.id ? meta : lib.current;
+    lib.loadedText = text;
+    driveFileId = lib.current.id;
+    fileBase = sanitizeFileName(String(lib.current.name || '').replace(/\.(md|markdown|txt)$/i, ''));
+    storageSet();
+    persistCurrent();
+  }
+
+  /* --- Markdown との往復: 赤字の追記 <ins data-u data-t>・削除 <del data-u data-t> はそのまま保つ --- */
+  turndown.addRule('reviewMarks', {
+    filter: function (node) {
+      return (node.nodeName === 'INS' || node.nodeName === 'DEL') && node.hasAttribute('data-u');
+    },
+    replacement: function (content, node) {
+      var tag = node.nodeName.toLowerCase();
+      content = content.replace(/  \n/g, '<br>').replace(/\n+/g, ' ');
+      if (!content) return '';
+      return '<' + tag + ' data-u="' + escapeHtml(node.getAttribute('data-u')) + '" data-t="' + escapeHtml(node.getAttribute('data-t') || '') + '">' + content + '</' + tag + '>';
+    }
+  });
+
+  /* --- クライアントの提案モード: 追記は <ins>（赤字）、削除は <del>（赤の取り消し線）にする --- */
+  var clComposeIns = null;   // IME 入力の間だけ使う追記の箱
+  function markOf(node) { return closestIn(node, 'ins[data-u], del[data-u]'); }
+  function ownIns(node) {
+    var el = node && node.nodeType !== 1 ? node.parentNode : node;
+    var ins = el && el.closest ? el.closest('ins[data-u]') : null;
+    return ins && pvEl.contains(ins) && ins.getAttribute('data-u') === myName() ? ins : null;
+  }
+  function clNewIns() {
+    var ins = document.createElement('ins');
+    ins.setAttribute('data-u', myName());
+    ins.setAttribute('data-t', todayStamp());
+    return ins;
+  }
+  function clNewDel() {
+    var del = document.createElement('del');
+    del.setAttribute('data-u', myName());
+    del.setAttribute('data-t', todayStamp());
+    return del;
+  }
+  // カーソルが赤字（追記・削除）のちょうど端にあるときは外に出す（隣に打った文字が他人の変更に混ざらないように）
+  function escapeMarkEdge() {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
+    var r = sel.getRangeAt(0);
+    var mk = markOf(r.startContainer);
+    while (mk) {
+      var toEnd = document.createRange();
+      toEnd.setStart(r.startContainer, r.startOffset);
+      toEnd.setEndAfter(mk.lastChild || mk);
+      var toStart = document.createRange();
+      toStart.setStartBefore(mk.firstChild || mk);
+      toStart.setEnd(r.startContainer, r.startOffset);
+      if (toEnd.toString() === '' && !toEnd.cloneContents().querySelector('br')) clCaretAfter(mk);
+      else if (toStart.toString() === '' && !toStart.cloneContents().querySelector('br')) clCaretBefore(mk);
+      else return;
+      r = sel.getRangeAt(0);
+      mk = markOf(r.startContainer);
+    }
+  }
+  // ブラウザは要素の直後のカーソルを要素の中に戻してしまうので、文字は自分で外に入れる
+  var userComposeNode = null;
+  pvEl.addEventListener('beforeinput', function (e) {
+    if (clientMode()) return;
+    var t = e.inputType || '';
+    if (t !== 'insertText' && t !== 'insertReplacementText') return;
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !sel.isCollapsed || !markOf(sel.getRangeAt(0).startContainer)) return;
+    e.preventDefault();
+    escapeMarkEdge();
+    var r = sel.getRangeAt(0);
+    var tn = document.createTextNode(e.data || '');
+    r.insertNode(tn);
+    clSetCaret(tn, tn.nodeValue.length);
+    edChanged();
+  });
+  pvEl.addEventListener('compositionstart', function () {
+    if (clientMode()) return;
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !sel.isCollapsed || !markOf(sel.getRangeAt(0).startContainer)) return;
+    escapeMarkEdge();
+    var r = sel.getRangeAt(0);
+    if (markOf(r.startContainer)) return;   // 赤字の途中: そのまま
+    var z = document.createTextNode('​');
+    r.insertNode(z);
+    clSetCaret(z, 1);
+    userComposeNode = z;
+  });
+  pvEl.addEventListener('compositionend', function () {
+    if (!userComposeNode) return;
+    var z = userComposeNode;
+    userComposeNode = null;
+    if (z.parentNode) {
+      z.nodeValue = z.nodeValue.replace(/​/g, '');
+      if (z.nodeValue) clSetCaret(z, z.nodeValue.length);
+      else z.parentNode.removeChild(z);
+    }
+    edChanged();
+  });
+  function clBlocked(r) {
+    if (closestIn(r.startContainer, 'pre, [data-md]') || closestIn(r.endContainer, 'pre, [data-md]')) return 'コード・数式・図・目次の変更は提案できません';
+    var bs = closestIn(r.startContainer, 'p, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, div');
+    var be = closestIn(r.endContainer, 'p, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, div');
+    if (bs !== be) return '段落をまたぐ操作はできません。段落ごとに直してください';
+    if (!r.collapsed) {
+      var c = r.cloneContents();
+      if (c.querySelector && c.querySelector('img, table, [data-md], pre, ul, ol')) return '画像・表・図・数式を含む範囲は提案できません';
+    }
+    return '';
+  }
+  function clSetCaret(node, offset) {
+    var r = document.createRange();
+    r.setStart(node, offset);
+    r.collapse(true);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    edRange = r.cloneRange();
+  }
+  function clCaretAfter(node) { clSetCaret(node.parentNode, Array.prototype.indexOf.call(node.parentNode.childNodes, node) + 1); }
+  function clCaretBefore(node) { clSetCaret(node.parentNode, Array.prototype.indexOf.call(node.parentNode.childNodes, node)); }
+  function clCaretEnd(el) {
+    var last = el.lastChild;
+    if (last && last.nodeType === 3) clSetCaret(last, last.nodeValue.length);
+    else clSetCaret(el, el.childNodes.length);
+  }
+  // 範囲を「削除の提案」にする。自分の追記は本当に消し、すでに削除扱いの部分は二重にしない
+  function clDelete(r, forward) {
+    if (r.collapsed) return false;
+    var msg = clBlocked(r);
+    if (msg) { setStatus(msg); return false; }
+    var mk = markOf(r.startContainer);
+    if (mk && mk.nodeName === 'DEL' && mk === markOf(r.endContainer)) {
+      // すでに削除の中: 消さずにカーソルを外へ
+      if (forward) clCaretAfter(mk); else clCaretBefore(mk);
+      return true;
+    }
+    var ownS = ownIns(r.startContainer);
+    if (ownS && ownS === ownIns(r.endContainer)) {
+      // 自分の追記の中: 本当に消す
+      r.extractContents();
+      if (!ownS.textContent.replace(/​/g, '') && !ownS.querySelector('br')) {
+        var pp = ownS.parentNode, pi = Array.prototype.indexOf.call(pp.childNodes, ownS);
+        pp.removeChild(ownS);
+        clSetCaret(pp, pi);
+      } else {
+        clSetCaret(r.startContainer, r.startOffset);
+      }
+      edChanged();
+      return true;
+    }
+    var frag = r.extractContents();
+    Array.prototype.forEach.call(frag.querySelectorAll('ins[data-u]'), function (el) {
+      if (el.getAttribute('data-u') === myName() && el.parentNode) el.parentNode.removeChild(el);
+    });
+    Array.prototype.forEach.call(frag.querySelectorAll('del[data-u]'), unwrapNode);
+    var hasText = !!frag.textContent.replace(/​/g, '') || !!frag.querySelector('br');
+    if (!hasText) { clSetCaret(r.startContainer, r.startOffset); edChanged(); return true; }
+    var del = clNewDel();
+    del.appendChild(frag);
+    r.insertNode(del);
+    del = clMergeAround(del);
+    if (forward) clCaretAfter(del); else clCaretBefore(del);
+    edChanged();
+    return true;
+  }
+  // 同じ人の削除が隣り合ったら1つにまとめる（1文字ずつ消しても1件にする）
+  function sideOf(el, next) {
+    var n = next ? el.nextSibling : el.previousSibling;
+    while (n && n.nodeType === 3 && !n.nodeValue.replace(/​/g, '')) n = next ? n.nextSibling : n.previousSibling;
+    return n;
+  }
+  function sameMark(a, b) {
+    return a && b && a.nodeType === 1 && b.nodeType === 1 && a.nodeName === b.nodeName && a.getAttribute('data-u') === b.getAttribute('data-u') && a.getAttribute('data-t') === b.getAttribute('data-t');
+  }
+  function clMergeAround(el) {
+    var prev = sideOf(el, false);
+    if (sameMark(prev, el)) {
+      while (prev.nextSibling !== el) prev.parentNode.removeChild(prev.nextSibling);
+      while (el.firstChild) prev.appendChild(el.firstChild);
+      el.parentNode.removeChild(el);
+      el = prev;
+    }
+    var next = sideOf(el, true);
+    if (sameMark(el, next)) {
+      while (el.nextSibling !== next) el.parentNode.removeChild(el.nextSibling);
+      while (next.firstChild) el.appendChild(next.firstChild);
+      next.parentNode.removeChild(next);
+    }
+    el.normalize();
+    return el;
+  }
+  // 追記（文字または改行）。自分の追記の中なら続けて書き、そうでなければ新しい赤字の箱を作る。削除の中には書かず、その後ろに書く
+  function clInsert(text, lineBreak) {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    var r = sel.getRangeAt(0);
+    if (!r.collapsed) {
+      if (!clDelete(r, true)) return;
+      r = sel.getRangeAt(0);
+    } else {
+      var msg = clBlocked(r);
+      if (msg) { setStatus(msg); return; }
+    }
+    if (!ownIns(r.startContainer)) { escapeMarkEdge(); r = sel.getRangeAt(0); }
+    var own = ownIns(r.startContainer);
+    var node;
+    if (own) {
+      node = lineBreak ? document.createElement('br') : document.createTextNode(text);
+      r.insertNode(node);
+      if (lineBreak) {
+        // 行末の <br> は見えないので、続けて打てるようにもう1つ入れておく（保存のときに余分な <br> は落とす）
+        if (!node.nextSibling) { var tail = document.createElement('br'); own.appendChild(tail); clCaretBefore(tail); return edChanged(); }
+        clCaretAfter(node);
+      } else {
+        clSetCaret(node, node.nodeValue.length);
+      }
+      return edChanged();
+    }
+    var ins = clNewIns();
+    if (lineBreak) { ins.appendChild(document.createElement('br')); ins.appendChild(document.createElement('br')); }
+    else ins.appendChild(document.createTextNode(text));
+    var mk = markOf(r.startContainer);
+    if (mk && mk.nodeName === 'DEL') mk.parentNode.insertBefore(ins, mk.nextSibling);
+    else r.insertNode(ins);
+    ins = clMergeAround(ins);
+    if (lineBreak) clCaretBefore(ins.lastChild); else clCaretEnd(ins);
+    edChanged();
+  }
+  function staticToRange(sr) {
+    var r = document.createRange();
+    r.setStart(sr.startContainer, sr.startOffset);
+    r.setEnd(sr.endContainer, sr.endOffset);
+    return r;
+  }
+  pvEl.addEventListener('beforeinput', function (e) {
+    if (!clientMode()) return;
+    var t = e.inputType || '';
+    if (t === 'historyUndo' || t === 'historyRedo' || t === 'insertCompositionText' || t === 'deleteCompositionText') return;
+    if (/^format/.test(t) || t === 'insertFromDrop' || t === 'deleteByDrag' || t === 'insertHorizontalRule' || t === 'insertOrderedList' || t === 'insertUnorderedList' || t === 'insertLink') {
+      e.preventDefault();
+      setStatus('提案モードでは、文字の追記（赤字）と削除（赤の取り消し線）だけができます');
+      return;
+    }
+    if (t === 'insertText' || t === 'insertReplacementText' || t === 'insertFromPaste' || t === 'insertFromYank' || t === 'insertTranspose' || t === 'insertParagraph' || t === 'insertLineBreak') {
+      e.preventDefault();
+      var text = e.data;
+      if ((text === null || text === undefined) && e.dataTransfer) text = e.dataTransfer.getData('text/plain');
+      text = String(text || '').replace(/\r\n?/g, '\n');
+      if (t === 'insertParagraph' || t === 'insertLineBreak') { clInsert('', true); return; }
+      var lines = text.split('\n');
+      lines.forEach(function (ln, i) {
+        if (i) clInsert('', true);
+        if (ln) clInsert(ln, false);
+      });
+      return;
+    }
+    if (/^delete/.test(t)) {
+      e.preventDefault();
+      var ranges = e.getTargetRanges ? e.getTargetRanges() : [];
+      var r = ranges.length ? staticToRange(ranges[0]) : (window.getSelection().rangeCount ? window.getSelection().getRangeAt(0) : null);
+      if (!r) return;
+      clDelete(r, /Forward$/.test(t));
+    }
+  });
+  // IME（日本語入力）: 変換中の文字は止められないので、始まる前に赤字の箱を用意しておく
+  pvEl.addEventListener('compositionstart', function () {
+    if (!clientMode()) return;
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    var r = sel.getRangeAt(0);
+    if (clBlocked(r)) return;
+    if (!r.collapsed) { if (!clDelete(r, true)) return; r = sel.getRangeAt(0); }
+    if (ownIns(r.startContainer)) return;
+    escapeMarkEdge();
+    r = sel.getRangeAt(0);
+    var ins = clNewIns();
+    var z = document.createTextNode('​');
+    ins.appendChild(z);
+    var mk = markOf(r.startContainer);
+    if (mk && mk.nodeName === 'DEL') mk.parentNode.insertBefore(ins, mk.nextSibling);
+    else r.insertNode(ins);
+    clSetCaret(z, 1);
+    clComposeIns = ins;
+  });
+  pvEl.addEventListener('compositionend', function () {
+    if (!clientMode() || !clComposeIns) return;
+    var ins = clComposeIns;
+    clComposeIns = null;
+    var w = document.createTreeWalker(ins, NodeFilter.SHOW_TEXT, null);
+    var n, zs = [];
+    while ((n = w.nextNode())) { if (n.nodeValue.indexOf('​') >= 0) zs.push(n); }
+    zs.forEach(function (tn) { tn.nodeValue = tn.nodeValue.replace(/​/g, ''); });
+    if (!ins.textContent && !ins.querySelector('br')) { if (ins.parentNode) ins.parentNode.removeChild(ins); }
+    else clCaretEnd(ins);
+    edChanged();
+  });
+  // 提案モードでは、書式・表・部品の操作はしない（ダイアログも開かない）
+  pvEl.addEventListener('click', function (e) {
+    if (clientMode() && e.target.closest && e.target.closest('[data-md]') && !e.target.closest('.toc a')) {
+      e.stopImmediatePropagation();
+      setStatus('提案モードでは数式・図・目次は変更できません');
+    }
+  }, true);
+
+  /* --- マスター: クライアントの変更の採用／却下（ユーザー・クライアントは見るだけ） --- */
+  var rvPop = document.getElementById('rv-pop');
+  var rvTarget = null;
+  var rvIndex = -1;
+  function rvMarks() { return pvEl.querySelectorAll('ins[data-u], del[data-u]'); }
+  function rvRefresh() {
+    var n = rvMarks().length;
+    document.getElementById('rv-count').textContent = String(n);
+    document.getElementById('rv-grp').hidden = role !== 'master' || !n;
+    if (rvTarget && !pvEl.contains(rvTarget)) rvClose();
+  }
+  function rvInfo(el) {
+    return (el.nodeName === 'INS' ? '追記' : '削除') + '：' + (el.getAttribute('data-u') || '') + (el.getAttribute('data-t') ? '　' + fmtDate8(el.getAttribute('data-t')) : '');
+  }
+  function rvOpen(el) {
+    rvTarget = el;
+    Array.prototype.forEach.call(pvEl.querySelectorAll('.rv-cur'), function (x) { x.classList.remove('rv-cur'); });
+    el.classList.add('rv-cur');
+    document.getElementById('rv-info').textContent = rvInfo(el);
+    var wrap = pvEl.parentNode;
+    var wr = wrap.getBoundingClientRect();
+    var r = el.getBoundingClientRect();
+    rvPop.hidden = false;
+    rvPop.style.left = Math.max(0, Math.min(r.left - wr.left + wrap.scrollLeft, wrap.clientWidth - rvPop.offsetWidth - 8)) + 'px';
+    rvPop.style.top = (r.bottom - wr.top + wrap.scrollTop + 4) + 'px';
+  }
+  function rvClose() {
+    rvPop.hidden = true;
+    if (rvTarget) rvTarget.classList.remove('rv-cur');
+    rvTarget = null;
+  }
+  function rvAccept(el) { if (el.nodeName === 'INS') unwrapNode(el); else if (el.parentNode) el.parentNode.removeChild(el); }
+  function rvReject(el) { if (el.nodeName === 'INS') { if (el.parentNode) el.parentNode.removeChild(el); } else unwrapNode(el); }
+  function rvDone() {
+    pvEl.normalize();
+    rvClose();
+    edChanged();
+    rvRefresh();
+  }
+  pvEl.addEventListener('click', function (e) {
+    var el = e.target.closest ? e.target.closest('ins[data-u], del[data-u]') : null;
+    if (!el || !pvEl.contains(el)) return;
+    if (role === 'master') { rvOpen(el); return; }
+    setStatus(rvInfo(el) + '（採用・却下はマスターが行います）');
+  });
+  document.getElementById('rv-accept').addEventListener('click', function () { if (rvTarget) { rvAccept(rvTarget); rvDone(); setStatus('採用しました'); } });
+  document.getElementById('rv-reject').addEventListener('click', function () { if (rvTarget) { rvReject(rvTarget); rvDone(); setStatus('却下しました'); } });
+  document.getElementById('rv-close').addEventListener('click', rvClose);
+  document.getElementById('rv-next').addEventListener('click', function () {
+    var marks = rvMarks();
+    if (!marks.length) return;
+    rvIndex = (rvIndex + 1) % marks.length;
+    marks[rvIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    rvOpen(marks[rvIndex]);
+  });
+  document.getElementById('rv-accept-all').addEventListener('click', function () {
+    var marks = rvMarks();
+    if (!marks.length || !confirm(marks.length + '件の変更をすべて採用しますか？（追記を本文にし、削除を消します）')) return;
+    Array.prototype.forEach.call(marks, function (el) { if (pvEl.contains(el)) rvAccept(el); });
+    rvDone();
+    setStatus('すべて採用しました');
+  });
+  document.getElementById('rv-reject-all').addEventListener('click', function () {
+    var marks = rvMarks();
+    if (!marks.length || !confirm(marks.length + '件の変更をすべて却下しますか？（追記を消し、削除を元に戻します）')) return;
+    Array.prototype.forEach.call(marks, function (el) { if (pvEl.contains(el)) rvReject(el); });
+    rvDone();
+    setStatus('すべて却下しました');
+  });
+  pvEl.addEventListener('input', function () { if (role === 'master') rvRefresh(); });
 
   /* ---------- shortcuts ---------- */
   window.addEventListener('keydown', function (e) {

@@ -1,0 +1,9 @@
+{
+  "clientId": "xxxxxxxxxxxx-xxxxxxxx.apps.googleusercontent.com",
+  "apiKey": "AIzaSy-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "appId": "",
+  "scope": "full",
+  "folderId": "",
+  "folderName": "",
+  "masters": ["master@example.com"]
+}
