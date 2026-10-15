@@ -1,0 +1,980 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markdown to PDF</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/styles/github.min.css">
+<style id="page-style">@page { size: A4; margin: 15mm; }</style>
+<style>
+  :root {
+    --bg: #f3f4f6;
+    --panel: #ffffff;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --border: #d1d5db;
+    --accent: #2563eb;
+    --accent-text: #ffffff;
+    --editor-bg: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111827;
+      --panel: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border: #374151;
+      --accent: #3b82f6;
+      --editor-bg: #0f172a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Noto Sans JP", system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- toolbar ---------- */
+  header.toolbar {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  .toolbar h1 { font-size: 16px; margin: 0 12px 0 0; }
+  .toolbar .spacer { flex: 1; }
+  .toolbar label.field { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+  button, select {
+    font: inherit; font-size: 13px; padding: 6px 12px;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--panel); color: var(--text); cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: wait; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  #status { font-size: 12px; color: var(--muted); min-width: 10em; }
+
+  /* ---------- layout ---------- */
+  main { flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+  .pane { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
+  .pane:last-child { border-right: 0; }
+  .pane-head {
+    font-size: 12px; color: var(--muted); padding: 6px 16px;
+    background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  #md {
+    flex: 1; width: 100%; resize: none; border: 0; outline: none; padding: 16px;
+    font-family: "Noto Sans Mono", ui-monospace, monospace; font-size: 14px; line-height: 1.7;
+    background: var(--editor-bg); color: var(--text); tab-size: 2;
+  }
+  .preview-wrap { flex: 1; overflow: auto; padding: 24px 16px; background: var(--bg); }
+  #preview {
+    background: #ffffff; color: #111111;
+    max-width: var(--page-w, 210mm);
+    padding: var(--page-m, 15mm);
+    min-height: var(--page-h, 297mm);
+    margin: 0 auto;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .15);
+    outline: none;
+  }
+  #preview:focus { box-shadow: 0 0 0 2px var(--accent); }
+  body.dragover main { outline: 3px dashed var(--accent); outline-offset: -6px; }
+
+  @media screen {
+    /* 数式・図・目次はプレビュー上では編集不可の部品（Markdown側で編集） */
+    #preview [data-md] { cursor: default; border-radius: 4px; }
+    #preview [data-md]:hover { outline: 1px dashed #93c5fd; outline-offset: 2px; }
+  }
+
+  @media (max-width: 800px) {
+    main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    .pane { border-right: 0; border-bottom: 1px solid var(--border); }
+    #preview { padding: 16px; min-height: auto; }
+    .toolbar h1 { width: 100%; }
+  }
+
+  /* ---------- document (paper) style ---------- */
+  .markdown-body { font-family: "Noto Sans JP", sans-serif; font-size: 11pt; line-height: 1.8; word-wrap: break-word; }
+  .markdown-body > :first-child { margin-top: 0; }
+  .markdown-body h1 { font-size: 20pt; border-bottom: 2px solid #333; padding-bottom: .2em; margin: 0 0 .8em; }
+  .markdown-body h2 { font-size: 15pt; border-bottom: 1px solid #ccc; padding-bottom: .15em; margin: 1.6em 0 .6em; }
+  .markdown-body h3 { font-size: 13pt; margin: 1.4em 0 .5em; }
+  .markdown-body h4, .markdown-body h5, .markdown-body h6 { font-size: 11pt; margin: 1.2em 0 .4em; }
+  .markdown-body p { margin: .6em 0; }
+  .markdown-body ul, .markdown-body ol { padding-left: 1.6em; margin: .6em 0; }
+  .markdown-body li { margin: .2em 0; }
+  .markdown-body li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.3em; }
+  .markdown-body code {
+    font-family: "Noto Sans Mono", ui-monospace, monospace; font-size: .9em;
+    background: #f3f4f6; padding: .1em .35em; border-radius: 3px;
+  }
+  .markdown-body pre {
+    background: #f6f8fa; border: 1px solid #e5e7eb; padding: 12px; border-radius: 6px;
+    overflow: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  .markdown-body pre code, .markdown-body pre code.hljs { background: none; padding: 0; display: inline; overflow: visible; }
+  .markdown-body table { border-collapse: collapse; width: 100%; margin: .8em 0; }
+  .markdown-body th, .markdown-body td { border: 1px solid #bbb; padding: 6px 10px; text-align: left; }
+  .markdown-body th { background: #f3f4f6; }
+  .markdown-body blockquote { margin: .8em 0; padding: .2em 1em; border-left: 4px solid #ccc; color: #555; }
+  .markdown-body img { max-width: 100%; }
+  .markdown-body hr { border: 0; border-top: 1px solid #ccc; margin: 1.5em 0; }
+  .markdown-body a { color: #2563eb; }
+
+  /* 数式 */
+  .markdown-body .math-block { margin: .9em 0; text-align: center; overflow-x: auto; overflow-y: hidden; }
+  .markdown-body .math-inline .katex { font-size: 1.05em; }
+  .markdown-body .math-error { color: #cf222e; font-family: "Noto Sans Mono", monospace; font-size: .9em; }
+
+  /* Mermaid図 */
+  .markdown-body .mermaid-block { margin: 1em 0; text-align: center; }
+  .markdown-body .mermaid-block svg { max-width: 100%; height: auto; }
+  .markdown-body .diagram-loading { color: #6b7280; font-size: .9em; }
+  .markdown-body .diagram-error {
+    text-align: left; color: #cf222e; background: #fff5f5; border-color: #f5c2c7; font-size: .85em;
+  }
+
+  /* 注意書きボックス（GFMアラート） */
+  .markdown-body .markdown-alert { margin: .9em 0; padding: .4em 1em; border-left: 4px solid; border-radius: 0 6px 6px 0; }
+  .markdown-body .markdown-alert > :last-child { margin-bottom: .3em; }
+  .markdown-body .markdown-alert-title { font-weight: 700; margin: .3em 0 .2em; }
+  .markdown-body .markdown-alert-note { border-color: #0969da; background: #f0f6ff; }
+  .markdown-body .markdown-alert-note .markdown-alert-title { color: #0969da; }
+  .markdown-body .markdown-alert-tip { border-color: #1a7f37; background: #f0fbf3; }
+  .markdown-body .markdown-alert-tip .markdown-alert-title { color: #1a7f37; }
+  .markdown-body .markdown-alert-important { border-color: #8250df; background: #f7f2ff; }
+  .markdown-body .markdown-alert-important .markdown-alert-title { color: #8250df; }
+  .markdown-body .markdown-alert-warning { border-color: #9a6700; background: #fff8e6; }
+  .markdown-body .markdown-alert-warning .markdown-alert-title { color: #9a6700; }
+  .markdown-body .markdown-alert-caution { border-color: #cf222e; background: #fff1f1; }
+  .markdown-body .markdown-alert-caution .markdown-alert-title { color: #cf222e; }
+
+  /* 目次 */
+  .markdown-body .toc { margin: 1em 0 1.4em; padding: .6em 1.2em; border: 1px solid #d0d7de; border-radius: 6px; background: #fafbfc; }
+  .markdown-body .toc-title { font-weight: 700; margin: .2em 0 .4em; }
+  .markdown-body .toc ul { list-style: none; padding-left: 0; margin: 0; }
+  .markdown-body .toc li { margin: .15em 0; }
+  .markdown-body .toc .toc-l2 { padding-left: 1.2em; }
+  .markdown-body .toc .toc-l3 { padding-left: 2.4em; }
+  .markdown-body .toc a { color: #1f2937; text-decoration: none; }
+  .markdown-body .toc-empty { color: #6b7280; font-size: .9em; }
+
+  /* 改ページ・ページ内での分割回避 */
+  .markdown-body h1, .markdown-body h2, .markdown-body h3 { break-after: avoid; page-break-after: avoid; }
+  .markdown-body pre, .markdown-body table, .markdown-body blockquote, .markdown-body img,
+  .markdown-body .math-block, .markdown-body .mermaid-block, .markdown-body .markdown-alert {
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .markdown-body .page-break { break-after: page; page-break-after: always; border-top: 1px dashed #999; margin: 1.5em 0; height: 0; }
+  .pdf-export { background: #ffffff; color: #111111; }
+  .pdf-export .page-break { border: 0; margin: 0; }
+
+  /* ---------- print ---------- */
+  @media print {
+    html, body { height: auto; background: #ffffff; display: block; }
+    .no-print { display: none !important; }
+    main { display: block; }
+    .pane { border: 0; }
+    .preview-wrap { padding: 0; overflow: visible; background: #ffffff; }
+    #preview { box-shadow: none; max-width: none; min-height: 0; padding: 0; margin: 0; }
+    .markdown-body .page-break { border: 0; margin: 0; }
+    .markdown-body .math-block { overflow: visible; }
+    .markdown-body .markdown-alert, .markdown-body .toc, .markdown-body pre, .markdown-body th {
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+  }
+</style>
+</head>
+<body>
+<header class="toolbar no-print">
+  <h1>Markdown to PDF</h1>
+  <button type="button" id="btn-new">新規</button>
+  <button type="button" id="btn-open">開く</button>
+  <button type="button" id="btn-save">.md保存</button>
+  <label class="field">用紙
+    <select id="page-size">
+      <option value="A4" selected>A4</option>
+      <option value="A5">A5</option>
+      <option value="Letter">Letter</option>
+    </select>
+  </label>
+  <label class="field">余白
+    <select id="page-margin">
+      <option value="10">10mm</option>
+      <option value="15" selected>15mm</option>
+      <option value="20">20mm</option>
+      <option value="25">25mm</option>
+    </select>
+  </label>
+  <span class="spacer"></span>
+  <span id="status">準備中...</span>
+  <button type="button" id="btn-download">PDFダウンロード</button>
+  <button type="button" id="btn-print" class="primary">PDF出力（印刷）</button>
+  <input type="file" id="file-input" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
+</header>
+
+<main>
+  <section class="pane no-print">
+    <div class="pane-head">Markdown（編集可）</div>
+    <textarea id="md" spellcheck="false" aria-label="Markdown"></textarea>
+  </section>
+  <section class="pane">
+    <div class="pane-head no-print">プレビュー = PDFの見た目（直接編集可。数式・図・目次はMarkdown側で編集）</div>
+    <div class="preview-wrap">
+      <article id="preview" class="markdown-body" contenteditable="true" aria-label="プレビュー"></article>
+    </div>
+  </section>
+</main>
+
+<script type="text/plain" id="sample"># サンプル文書
+
+[TOC]
+
+このツールは **Markdown** と **プレビュー** を双方向に同期します。左右どちらを編集しても、もう片方に反映されます。
+
+## 使い方
+
+1. 左のMarkdown欄を編集する
+2. または右のプレビューを直接編集する
+3. 「PDF出力（印刷）」で保存先に「PDFに保存」を選ぶ
+
+> [!TIP]
+> 数式・図・目次はプレビュー上では編集できない部品です。左のMarkdown側で編集してください。
+
+## 数式
+
+文中の数式は $E = mc^2$ のように書きます。独立した数式は次のとおりです。
+
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$
+
+## 図（Mermaid）
+
+```mermaid
+flowchart LR
+  A[Markdown] --> B[プレビュー]
+  B --> A
+  B --> C[PDF]
+```
+
+## コード
+
+```js
+function greet(name) {
+  return "Hello, " + name;
+}
+```
+
+## 表
+
+| 項目 | 内容 |
+| --- | --- |
+| 用紙 | A4 / A5 / Letter |
+| 余白 | 10〜25mm |
+
+## 注意書き
+
+> [!NOTE]
+> 補足情報を書くボックスです。
+
+> [!WARNING]
+> 警告を書くボックスです。種類は NOTE / TIP / IMPORTANT / WARNING / CAUTION の5つです。
+
+<div class="page-break"></div>
+
+## 2ページ目
+
+- [x] 双方向同期
+- [x] 数式・図・コードの色分け
+- [ ] PDF出力
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/turndown@7.2.0/dist/turndown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/turndown-plugin-gfm@1.0.2/dist/turndown-plugin-gfm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var HTML2PDF_URL = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js';
+  var MERMAID_URL = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js';
+  var STORAGE_KEY = 'md2pdf:v1';
+  var PAGE_SIZES = {
+    A4:     { css: 'A4',     jspdf: 'a4',     w: 210,   h: 297 },
+    A5:     { css: 'A5',     jspdf: 'a5',     w: 148,   h: 210 },
+    Letter: { css: 'letter', jspdf: 'letter', w: 215.9, h: 279.4 }
+  };
+
+  var mdEl = document.getElementById('md');
+  var pvEl = document.getElementById('preview');
+  var statusEl = document.getElementById('status');
+  var fileInput = document.getElementById('file-input');
+  var pageSizeEl = document.getElementById('page-size');
+  var pageMarginEl = document.getElementById('page-margin');
+  var pageStyleEl = document.getElementById('page-style');
+
+  var fileBase = '';
+  var originalTitle = document.title;
+
+  /* ---------- library check ---------- */
+  if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined' ||
+      typeof TurndownService === 'undefined' || typeof turndownPluginGfm === 'undefined') {
+    statusEl.textContent = 'ライブラリの読み込みに失敗しました。ネット接続を確認してください。';
+    return;
+  }
+
+  /* ---------- converters ---------- */
+  var ALERT_LABELS = {
+    NOTE: '注記',
+    TIP: 'ヒント',
+    IMPORTANT: '重要',
+    WARNING: '警告',
+    CAUTION: '注意'
+  };
+
+  function enc(s) { return encodeURIComponent(s); }
+  function dec(s) { try { return decodeURIComponent(s || ''); } catch (e) { return ''; } }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  var MATH_BLOCK_RE = /^\$\$([\s\S]+?)\$\$[ \t]*(?:\n+|$)/;
+  var MATH_INLINE_DISPLAY_RE = /^\$\$((?:\\[\s\S]|[^\\$])+?)\$\$/;
+  var MATH_INLINE_RE = /^\$(?!\s)((?:\\[\s\S]|[^\\$\n])+?)\$(?!\d)/;
+  var TOC_RE = /^\[TOC\][ \t]*(?:\n+|$)/i;
+
+  marked.use({
+    gfm: true,
+    breaks: false,
+    extensions: [
+      {
+        // $$ ... $$ （独立した数式）
+        name: 'mathBlock',
+        level: 'block',
+        start: function (src) {
+          var m = src.match(/(^|\n)\$\$/);
+          return m ? m.index + m[1].length : undefined;
+        },
+        tokenizer: function (src) {
+          var m = MATH_BLOCK_RE.exec(src);
+          if (m) return { type: 'mathBlock', raw: m[0], text: m[1].trim() };
+        },
+        renderer: function (token) {
+          return '<div class="math-block" data-md="' + enc(token.raw.replace(/\s+$/, '')) +
+            '" data-tex="' + enc(token.text) + '"></div>\n';
+        }
+      },
+      {
+        // $ ... $ （文中の数式）
+        name: 'mathInline',
+        level: 'inline',
+        start: function (src) {
+          var i = src.indexOf('$');
+          return i >= 0 ? i : undefined;
+        },
+        tokenizer: function (src) {
+          var m = MATH_INLINE_DISPLAY_RE.exec(src);
+          if (m) return { type: 'mathInline', raw: m[0], text: m[1].trim(), display: true };
+          m = MATH_INLINE_RE.exec(src);
+          if (m && !/\s$/.test(m[1])) return { type: 'mathInline', raw: m[0], text: m[1], display: false };
+        },
+        renderer: function (token) {
+          return '<span class="math-inline' + (token.display ? ' math-display' : '') +
+            '" data-md="' + enc(token.raw) + '" data-tex="' + enc(token.text) + '"></span>';
+        }
+      },
+      {
+        // [TOC] （目次）
+        name: 'toc',
+        level: 'block',
+        start: function (src) {
+          var m = src.match(/(^|\n)\[TOC\]/i);
+          return m ? m.index + m[1].length : undefined;
+        },
+        tokenizer: function (src) {
+          var m = TOC_RE.exec(src);
+          if (m) return { type: 'toc', raw: m[0] };
+        },
+        renderer: function () {
+          return '<nav class="toc" data-md="' + enc('[TOC]') + '"></nav>\n';
+        }
+      }
+    ],
+    renderer: {
+      code: function (code, infostring) {
+        var lang = String(infostring || '').trim().split(/\s+/)[0].toLowerCase();
+        if (lang !== 'mermaid') return false;
+        var body = String(code).replace(/\n+$/, '');
+        var src = '```mermaid\n' + body + '\n```';
+        return '<div class="mermaid-block" data-md="' + enc(src) + '" data-src="' + enc(body) + '"></div>\n';
+      },
+      blockquote: function (quote) {
+        var m = /^\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*(?:<br>)?\n?/i.exec(quote);
+        if (!m) return false;
+        var type = m[1].toUpperCase();
+        var body = quote.slice(m[0].length);
+        if (!/^\s*<p>/.test(body) && !/^\s*<(ul|ol|pre|table|div|h\d|blockquote)/.test(body)) body = '<p>' + body;
+        body = body.replace(/^\s*<p>\s*<\/p>\n?/, '');
+        return '<div class="markdown-alert markdown-alert-' + type.toLowerCase() + '" data-alert="' + type + '">' +
+          '<p class="markdown-alert-title">' + ALERT_LABELS[type] + '</p>\n' + body + '</div>\n';
+      }
+    }
+  });
+
+  var turndown = new TurndownService({
+    headingStyle: 'atx',
+    codeBlockStyle: 'fenced',
+    bulletListMarker: '-',
+    emDelimiter: '*',
+    strongDelimiter: '**',
+    hr: '---',
+    blankReplacement: function (content, node) {
+      var src = atomicSource(node);
+      if (src !== null) return isBlockAtomic(node) ? '\n\n' + src + '\n\n' : src;
+      if (node.nodeName === 'DIV' && node.classList && node.classList.contains('page-break')) {
+        return '\n\n<div class="page-break"></div>\n\n';
+      }
+      return node.isBlock ? '\n\n' : '';
+    }
+  });
+  turndown.use(turndownPluginGfm.gfm);
+
+  function atomicSource(node) {
+    if (!node || node.nodeType !== 1 || !node.hasAttribute('data-md')) return null;
+    return dec(node.getAttribute('data-md'));
+  }
+
+  function isBlockAtomic(node) {
+    return node.nodeName !== 'SPAN';
+  }
+
+  // 箇条書きを「- 項目」「1. 項目」の素直な形で出力する（余分な空白を入れない）
+  turndown.addRule('tightListItem', {
+    filter: 'li',
+    replacement: function (content, node, options) {
+      var parent = node.parentNode;
+      var prefix = options.bulletListMarker + ' ';
+      if (parent && parent.nodeName === 'OL') {
+        var start = parent.getAttribute('start');
+        var index = Array.prototype.indexOf.call(parent.children, node);
+        prefix = ((start ? Number(start) : 1) + index) + '. ';
+      }
+      content = content
+        .replace(/^\n+/, '')
+        .replace(/\n+$/, '\n')
+        .replace(/^(\[[ xX]\])\s+/, '$1 ')
+        .replace(/\n/gm, '\n' + ' '.repeat(prefix.length));
+      var trailing = (node.nextSibling && !/\n$/.test(content)) ? '\n' : '';
+      return prefix + content + trailing;
+    }
+  });
+
+  // チェックボックスは状態を保持したまま [x] / [ ] に変換
+  turndown.addRule('taskCheckbox', {
+    filter: function (node) {
+      return node.nodeName === 'INPUT' && node.getAttribute('type') === 'checkbox';
+    },
+    replacement: function (content, node) {
+      return (node.checked || node.hasAttribute('checked') ? '[x]' : '[ ]') + ' ';
+    }
+  });
+
+  // 注意書きボックス → > [!TYPE]
+  turndown.addRule('alertTitle', {
+    filter: function (node) {
+      return node.nodeName === 'P' && node.classList && node.classList.contains('markdown-alert-title');
+    },
+    replacement: function () { return ''; }
+  });
+  turndown.addRule('alert', {
+    filter: function (node) {
+      return node.nodeName === 'DIV' && node.hasAttribute('data-alert');
+    },
+    replacement: function (content, node) {
+      var type = String(node.getAttribute('data-alert') || 'NOTE').toUpperCase();
+      content = content.replace(/^\n+|\n+$/g, '');
+      var text = '[!' + type + ']' + (content ? '\n' + content : '');
+      var lines = text.split('\n').map(function (l) { return l ? '> ' + l : '>'; });
+      return '\n\n' + lines.join('\n') + '\n\n';
+    }
+  });
+
+  // 数式・Mermaid図・目次 → 元のMarkdownをそのまま戻す（最優先）
+  turndown.addRule('atomic', {
+    filter: function (node) {
+      return node.nodeType === 1 && node.hasAttribute('data-md');
+    },
+    replacement: function (content, node) {
+      var src = atomicSource(node) || '';
+      return isBlockAtomic(node) ? '\n\n' + src + '\n\n' : src;
+    }
+  });
+
+  function mdToHtml(md) {
+    return DOMPurify.sanitize(marked.parse(md || ''));
+  }
+
+  function htmlToMd(html) {
+    var md = turndown.turndown(html || '');
+    return md ? md + '\n' : '';
+  }
+
+  /* ---------- rich rendering (math / code / toc / mermaid) ---------- */
+  function renderMath(root) {
+    var nodes = root.querySelectorAll('[data-tex]');
+    Array.prototype.forEach.call(nodes, function (el) {
+      var tex = dec(el.getAttribute('data-tex'));
+      var display = el.classList.contains('math-block') || el.classList.contains('math-display');
+      if (typeof window.katex === 'undefined') {
+        el.textContent = display ? '$$' + tex + '$$' : '$' + tex + '$';
+        return;
+      }
+      try {
+        window.katex.render(tex, el, { displayMode: display, throwOnError: false, output: 'htmlAndMathml' });
+      } catch (e) {
+        el.innerHTML = '<span class="math-error">' + escapeHtml(tex) + '</span>';
+      }
+    });
+  }
+
+  function renderCode(root) {
+    if (typeof window.hljs === 'undefined') return;
+    var nodes = root.querySelectorAll('pre code[class*="language-"]');
+    Array.prototype.forEach.call(nodes, function (el) {
+      var m = /language-([\w+#.-]+)/.exec(el.className);
+      if (m && window.hljs.getLanguage(m[1])) {
+        try { window.hljs.highlightElement(el); } catch (e) { /* ignore */ }
+      }
+    });
+  }
+
+  function renderToc(root) {
+    var all = root.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    Array.prototype.forEach.call(all, function (h, i) { h.id = 'sec-' + (i + 1); });
+
+    var navs = root.querySelectorAll('nav.toc');
+    if (!navs.length) return;
+
+    // 見出し1が1つだけなら文書タイトルとみなし、目次は見出し2・3で作る
+    var h1Count = root.querySelectorAll('h1').length;
+    var heads = root.querySelectorAll(h1Count === 1 ? 'h2, h3' : 'h1, h2, h3');
+    var base = h1Count === 1 ? 2 : 1;
+
+    var html = '<p class="toc-title">目次</p>';
+    if (!heads.length) {
+      html += '<p class="toc-empty">見出しがありません</p>';
+    } else {
+      html += '<ul>';
+      Array.prototype.forEach.call(heads, function (h) {
+        var level = Number(h.tagName.charAt(1)) - base + 1;
+        html += '<li class="toc-l' + level + '"><a href="#' + h.id + '">' + escapeHtml(h.textContent) + '</a></li>';
+      });
+      html += '</ul>';
+    }
+    Array.prototype.forEach.call(navs, function (nav) { nav.innerHTML = html; });
+  }
+
+  var mermaidCache = new Map();
+  var mermaidSeq = 0;
+  var mermaidQueue = Promise.resolve();
+  var mermaidLoading = null;
+
+  function loadScript(url) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = url;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { s.remove(); reject(new Error('load failed: ' + url)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadMermaid() {
+    if (typeof window.mermaid !== 'undefined') return Promise.resolve();
+    if (mermaidLoading) return mermaidLoading;
+    mermaidLoading = loadScript(MERMAID_URL).then(function () {
+      window.mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'strict',
+        theme: 'default',
+        fontFamily: '"Noto Sans JP", sans-serif'
+      });
+    }).catch(function (e) {
+      mermaidLoading = null;
+      throw e;
+    });
+    return mermaidLoading;
+  }
+
+  function drawMermaid(el, src) {
+    if (mermaidCache.has(src)) {
+      if (el.isConnected) el.innerHTML = mermaidCache.get(src);
+      return Promise.resolve();
+    }
+    if (!el.isConnected) return Promise.resolve();
+    var id = 'mmd-' + (++mermaidSeq);
+    return Promise.resolve()
+      .then(function () { return window.mermaid.render(id, src); })
+      .then(function (result) {
+        mermaidCache.set(src, result.svg);
+        if (el.isConnected) el.innerHTML = result.svg;
+      }, function (err) {
+        ['d' + id, id].forEach(function (x) {
+          var n = document.getElementById(x);
+          if (n && !pvEl.contains(n)) n.remove();
+        });
+        if (el.isConnected) {
+          el.innerHTML = '<pre class="diagram-error">' +
+            escapeHtml('Mermaidの構文エラー: ' + ((err && err.message) || err)) + '</pre>';
+        }
+      });
+  }
+
+  function renderMermaid(root) {
+    var blocks = root.querySelectorAll('.mermaid-block');
+    var pending = [];
+    Array.prototype.forEach.call(blocks, function (el) {
+      var src = dec(el.getAttribute('data-src'));
+      if (mermaidCache.has(src)) {
+        el.innerHTML = mermaidCache.get(src);
+      } else {
+        el.innerHTML = '<p class="diagram-loading">図を描画中...</p>';
+        pending.push({ el: el, src: src });
+      }
+    });
+    if (!pending.length) return mermaidQueue;
+
+    mermaidQueue = mermaidQueue.then(function () {
+      return loadMermaid().then(function () {
+        return pending.reduce(function (p, job) {
+          return p.then(function () { return drawMermaid(job.el, job.src); });
+        }, Promise.resolve());
+      }, function () {
+        pending.forEach(function (job) {
+          if (job.el.isConnected) {
+            job.el.innerHTML = '<p class="diagram-error">Mermaidを読み込めませんでした（ネット接続を確認してください）</p>';
+          }
+        });
+      });
+    });
+    return mermaidQueue;
+  }
+
+  function lockAtomic(root) {
+    var nodes = root.querySelectorAll('[data-md], .markdown-alert-title');
+    Array.prototype.forEach.call(nodes, function (el) { el.setAttribute('contenteditable', 'false'); });
+  }
+
+  function renderPreview(md) {
+    pvEl.innerHTML = mdToHtml(md);
+    lockAtomic(pvEl);
+    renderMath(pvEl);
+    renderCode(pvEl);
+    renderToc(pvEl);
+    renderMermaid(pvEl);
+  }
+
+  /* ---------- helpers ---------- */
+  function debounce(fn, ms) {
+    var timer = null;
+    function d() {
+      clearTimeout(timer);
+      timer = setTimeout(function () { timer = null; fn(); }, ms);
+    }
+    d.flush = function () {
+      if (timer) { clearTimeout(timer); timer = null; fn(); }
+    };
+    return d;
+  }
+
+  function nowLabel() {
+    var d = new Date();
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+
+  function setStatus(text) {
+    statusEl.textContent = text;
+  }
+
+  function storageGet() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { return null; }
+  }
+
+  function storageSet() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        md: mdEl.value,
+        fileBase: fileBase,
+        pageSize: pageSizeEl.value,
+        margin: pageMarginEl.value
+      }));
+    } catch (e) { /* storage unavailable: ignore */ }
+  }
+
+  function sanitizeFileName(name) {
+    return (name || '').replace(/[\\\/:*?"<>|\r\n]+/g, '_').trim().slice(0, 80);
+  }
+
+  function getBaseName() {
+    if (fileBase) return fileBase;
+    var h1 = pvEl.querySelector('h1');
+    var name = sanitizeFileName(h1 ? h1.textContent : '');
+    return name || 'document';
+  }
+
+  /* ---------- sync ---------- */
+  function syncFromMarkdown() {
+    renderPreview(mdEl.value);
+    storageSet();
+    setStatus('同期済み（Markdown → プレビュー ' + nowLabel() + '）');
+  }
+
+  function syncFromPreview() {
+    mdEl.value = htmlToMd(pvEl.innerHTML);
+    storageSet();
+    setStatus('同期済み（プレビュー → Markdown ' + nowLabel() + '）');
+  }
+
+  var mdSync = debounce(syncFromMarkdown, 250);
+  var pvSync = debounce(syncFromPreview, 300);
+
+  function flushAll() {
+    mdSync.flush();
+    pvSync.flush();
+  }
+
+  function setContent(md) {
+    mdEl.value = md;
+    syncFromMarkdown();
+  }
+
+  mdEl.addEventListener('input', function () {
+    setStatus('編集中...');
+    mdSync();
+  });
+
+  pvEl.addEventListener('input', function () {
+    setStatus('編集中...');
+    pvSync();
+  });
+
+  // プレビュー編集の確定時に、Markdownから再描画して両者を完全に一致させる
+  pvEl.addEventListener('blur', function () {
+    pvSync.flush();
+    renderPreview(mdEl.value);
+  });
+
+  // プレビューへの貼り付けは書式を除いたテキストのみ
+  pvEl.addEventListener('paste', function (e) {
+    e.preventDefault();
+    var cd = e.clipboardData || window.clipboardData;
+    var text = cd ? cd.getData('text/plain') : '';
+    document.execCommand('insertText', false, text);
+  });
+
+  // 目次のリンクはプレビュー内でスクロール
+  pvEl.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('.toc a') : null;
+    if (!a) return;
+    e.preventDefault();
+    var target = document.getElementById(a.getAttribute('href').slice(1));
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) { /* ignore */ }
+
+  // Markdown欄でTabキーをスペース2つに
+  mdEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Tab' && !e.isComposing) {
+      e.preventDefault();
+      mdEl.setRangeText('  ', mdEl.selectionStart, mdEl.selectionEnd, 'end');
+      mdSync();
+    }
+  });
+
+  /* ---------- page settings ---------- */
+  function applyPageSettings() {
+    var size = PAGE_SIZES[pageSizeEl.value] || PAGE_SIZES.A4;
+    var m = Number(pageMarginEl.value) || 15;
+    pageStyleEl.textContent = '@page { size: ' + size.css + '; margin: ' + m + 'mm; }';
+    pvEl.style.setProperty('--page-w', size.w + 'mm');
+    pvEl.style.setProperty('--page-h', size.h + 'mm');
+    pvEl.style.setProperty('--page-m', m + 'mm');
+  }
+
+  pageSizeEl.addEventListener('change', function () { applyPageSettings(); storageSet(); });
+  pageMarginEl.addEventListener('change', function () { applyPageSettings(); storageSet(); });
+
+  /* ---------- file operations ---------- */
+  function readFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var text = String(reader.result || '').replace(/^﻿/, '');
+      fileBase = sanitizeFileName(file.name.replace(/\.(md|markdown|txt)$/i, ''));
+      setContent(text);
+      setStatus('読み込みました: ' + file.name);
+    };
+    reader.onerror = function () { setStatus('ファイルを読み込めませんでした'); };
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  document.getElementById('btn-open').addEventListener('click', function () {
+    fileInput.value = '';
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', function () {
+    readFile(fileInput.files && fileInput.files[0]);
+  });
+
+  function saveMarkdown() {
+    flushAll();
+    var blob = new Blob([mdEl.value], { type: 'text/markdown;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = getBaseName() + '.md';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    setStatus('Markdownを保存しました');
+  }
+
+  document.getElementById('btn-save').addEventListener('click', saveMarkdown);
+
+  document.getElementById('btn-new').addEventListener('click', function () {
+    if (mdEl.value && !confirm('現在の内容を破棄して新規作成しますか？')) return;
+    fileBase = '';
+    setContent('');
+    mdEl.focus();
+  });
+
+  // ドラッグ＆ドロップで.mdを開く
+  ['dragenter', 'dragover'].forEach(function (type) {
+    window.addEventListener(type, function (e) {
+      if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') >= 0) {
+        e.preventDefault();
+        document.body.classList.add('dragover');
+      }
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (type) {
+    window.addEventListener(type, function () { document.body.classList.remove('dragover'); });
+  });
+  window.addEventListener('drop', function (e) {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      e.preventDefault();
+      readFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  /* ---------- PDF: print (text-based, recommended) ---------- */
+  function waitForRender() {
+    var fonts = document.fonts ? document.fonts.ready : Promise.resolve();
+    return Promise.all([mermaidQueue, fonts]).catch(function () { /* ignore */ });
+  }
+
+  window.addEventListener('beforeprint', function () {
+    flushAll();
+    applyPageSettings();
+    document.title = getBaseName();
+  });
+  window.addEventListener('afterprint', function () {
+    document.title = originalTitle;
+  });
+
+  document.getElementById('btn-print').addEventListener('click', function () {
+    var btn = this;
+    flushAll();
+    applyPageSettings();
+    btn.disabled = true;
+    setStatus('印刷の準備中...');
+    waitForRender().then(function () {
+      btn.disabled = false;
+      setStatus('印刷画面で「PDFに保存」を選んでください');
+      window.print();
+    });
+  });
+
+  /* ---------- PDF: direct download (image-based) ---------- */
+  var html2pdfLoading = null;
+  function loadHtml2Pdf() {
+    if (typeof window.html2pdf !== 'undefined') return Promise.resolve();
+    if (html2pdfLoading) return html2pdfLoading;
+    html2pdfLoading = loadScript(HTML2PDF_URL).catch(function (e) {
+      html2pdfLoading = null;
+      throw e;
+    });
+    return html2pdfLoading;
+  }
+
+  document.getElementById('btn-download').addEventListener('click', function () {
+    flushAll();
+    var btn = this;
+    var size = PAGE_SIZES[pageSizeEl.value] || PAGE_SIZES.A4;
+    var m = Number(pageMarginEl.value) || 15;
+    btn.disabled = true;
+    setStatus('PDFを生成中...');
+
+    Promise.all([loadHtml2Pdf(), waitForRender()])
+      .then(function () {
+        var clone = document.createElement('div');
+        clone.className = 'markdown-body pdf-export';
+        clone.style.width = (size.w - m * 2) + 'mm';
+        clone.innerHTML = pvEl.innerHTML;
+        return window.html2pdf().set({
+          margin: m,
+          filename: getBaseName() + '.pdf',
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+          jsPDF: { unit: 'mm', format: size.jspdf, orientation: 'portrait' },
+          pagebreak: {
+            mode: ['css', 'legacy'],
+            after: '.page-break',
+            avoid: ['pre', 'table', 'blockquote', 'img', 'tr', '.math-block', '.mermaid-block', '.markdown-alert']
+          }
+        }).from(clone).save();
+      })
+      .then(function () { setStatus('PDFをダウンロードしました'); })
+      .catch(function () { setStatus('PDF生成に失敗しました。「PDF出力（印刷）」をお試しください'); })
+      .then(function () { btn.disabled = false; });
+  });
+
+  /* ---------- shortcuts ---------- */
+  window.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      saveMarkdown();
+    }
+  });
+
+  /* ---------- init ---------- */
+  var saved = storageGet();
+  if (saved && typeof saved.md === 'string') {
+    fileBase = saved.fileBase || '';
+    if (saved.pageSize && PAGE_SIZES[saved.pageSize]) pageSizeEl.value = saved.pageSize;
+    if (saved.margin) pageMarginEl.value = saved.margin;
+    applyPageSettings();
+    setContent(saved.md);
+  } else {
+    applyPageSettings();
+    setContent(document.getElementById('sample').textContent.replace(/^\n/, ''));
+  }
+})();
+</script>
+</body>
+</html>
