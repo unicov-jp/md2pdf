@@ -394,8 +394,8 @@
   <span class="spacer"></span>
   <span id="status">準備中...</span>
   <span id="role-badge" class="role-badge" hidden></span>
-  <button type="button" id="btn-users" hidden title="設定: ユーザーの登録・役割、ドライブ（Google Drive のフォルダ）、接続（マスターだけ）">設定</button>
-  <button type="button" id="btn-drive-settings" title="Google Drive の接続設定">Drive設定</button>
+  <button type="button" id="btn-users" title="設定: Google Drive の接続・フォルダ（URL）・取り込み、ユーザーの登録と権限">設定</button>
+  <button type="button" id="btn-drive-settings" hidden title="Google Drive の接続設定">Drive設定</button>
   <button type="button" id="btn-print" title="ブラウザの印刷から「PDFに保存」（文字を選択できるPDF）">PDF出力（印刷）</button>
   <input type="file" id="file-input" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
   <input type="file" id="img-input" accept="image/*" hidden>
@@ -405,12 +405,12 @@
   <aside id="lib" class="pane lib no-print" hidden>
     <div class="pane-head lib-head">
       <span class="lib-title">Google Drive</span>
-      <button type="button" id="lib-pick" title="チームのフォルダを選ぶ">フォルダ</button>
+      <button type="button" id="lib-pick" hidden title="チームのフォルダを選ぶ">フォルダ</button>
       <button type="button" id="lib-reload" title="一覧を読み直す（他の人の更新を取り込む）">再読込</button>
     </div>
     <div class="lib-sub">
       <select id="lib-drive" hidden title="ドライブ（記事のフォルダ）を切り替える"></select>
-      <span id="lib-name" class="lib-name">（フォルダ未選択）</span>
+      <span id="lib-name" class="lib-name">（フォルダ未設定。「設定」で指定）</span>
       <a id="lib-folder-link" href="#" target="_blank" rel="noopener" hidden>Driveで開く</a>
       <button type="button" id="lib-add-drive" hidden title="Drive のファイルを選んで一覧に加える（drive.file の権限のとき）">ファイルを追加</button>
     </div>
@@ -507,13 +507,23 @@
   </div>
 </main>
 
-<!-- 設定（マスターだけ。第5版）: 接続・ドライブ・ユーザー -->
+<!-- 設定（第5版）: 接続・フォルダ・取り込み・ユーザーと権限 -->
 <div id="tm-dlg" class="dlg no-print" hidden>
   <div class="dlg-panel narrow" role="dialog" aria-label="設定">
-    <div class="dlg-bar"><strong>設定（マスター）</strong><span class="spacer"></span><button type="button" id="tm-close">閉じる</button></div>
+    <div class="dlg-bar"><strong>設定</strong><span class="spacer"></span><button type="button" id="tm-close">閉じる</button></div>
     <div class="dlg-body">
-      <div class="row"><span class="lbl">接続</span><span class="muted">ルートフォルダ（名簿 md2pdf-team.json の置き場所）: <span id="tm-root">（未設定）</span></span><button type="button" id="tm-conn">接続の設定（クライアントID・APIキー・ルートフォルダ）</button></div>
+      <div class="row"><span class="lbl">接続</span><span id="tm-conn-state" class="muted">未接続</span>
+        <button type="button" id="tm-connect" class="primary">Google Drive に接続</button>
+        <button type="button" id="tm-conn">接続の設定（クライアントID・APIキー）</button></div>
+      <div class="row"><span class="lbl">ルートフォルダ</span><span class="muted">名簿（md2pdf-team.json）を置く場所。ドライブを登録しないときは、この直下の .md を一覧に出します: <span id="tm-root">（未設定）</span></span></div>
+      <div class="row">
+        <input type="text" id="tm-root-url" class="wide" placeholder="https://drive.google.com/drive/folders/XXXXXXXX（フォルダの URL または ID）" spellcheck="false" autocomplete="off">
+        <button type="button" id="tm-root-set">URLで設定</button>
+        <button type="button" id="tm-import">取り込み（一覧を読み込む）</button>
+      </div>
+      <p id="tm-roster-msg" class="dlg-hint" hidden></p>
 
+      <div id="tm-roster">
       <div class="row"><span class="lbl">ドライブ</span><span class="muted">記事（.md）を置く Google Drive のフォルダ。直下の .md を一覧に出します。フォルダの URL を貼って追加できます。</span></div>
       <ul id="tm-drives" class="tm-list"></ul>
       <div class="row">
@@ -522,7 +532,7 @@
         <button type="button" id="tm-drive-add">フォルダを選ぶ</button>
       </div>
 
-      <div class="row"><span class="lbl">ユーザー</span><span class="muted">名簿に無い Google アカウントは接続できません。クライアントは担当のドライブだけを見て直せます（ドライブ単位で指定）。</span></div>
+      <div class="row"><span class="lbl">ユーザーと権限</span><span class="muted">マスターを1人以上登録して保存すると、名簿に無い Google アカウントは接続できなくなります。クライアントは担当のドライブだけを見て直せます（ドライブ単位で指定）。</span></div>
       <table class="tm-table"><thead><tr><th>メールアドレス</th><th>名前</th><th>役割</th><th>ドライブ</th><th></th></tr></thead><tbody id="tm-users"></tbody></table>
       <div class="row">
         <input type="text" id="tm-email" placeholder="メールアドレス" spellcheck="false" autocomplete="off">
@@ -535,8 +545,9 @@
         <button type="button" id="tm-add">追加</button>
       </div>
       <label><input type="checkbox" id="tm-share" checked> Google Drive の共有も合わせて設定する（ユーザー: ルート閲覧＋全ドライブ編集、クライアント: ルート閲覧＋担当ドライブ編集。外した分は共有を解除。相手に Google から通知メールが届きます）</label>
-      <p class="dlg-hint">役割: マスター＝すべての操作（この画面、クライアントの変更の採用／却下を含む）。ユーザー＝記事の編集・Update・Rollback・書き出し（全ドライブ）。クライアント＝担当ドライブの記事に、文字の追記（赤字）と削除（赤の取り消し線）を提案して保存するだけ。最初のマスターは md2pdf-config.json の masters に書きます。名簿の変更は、相手が次に接続したときから効きます。</p>
+      <p class="dlg-hint">役割: マスター＝すべての操作（この画面、クライアントの変更の採用／却下を含む）。ユーザー＝記事の編集・Update・Rollback・書き出し（全ドライブ）。クライアント＝担当ドライブの記事に、文字の追記（赤字）と削除（赤の取り消し線）を提案して保存するだけ。役割の変更は「保存」で確定し、相手が次に接続したときから効きます。md2pdf-config.json の masters に書いたアカウントは、名簿に関係なく常にマスターです。</p>
       <div class="row right"><span id="tm-state" class="muted"></span><button type="button" id="tm-save" class="primary">保存</button></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1693,7 +1704,7 @@ function greet(name) {
     var label = driveCfg.folderId ? (driveCfg.folderName || driveCfg.folderId) : '（未選択。マイドライブ直下に保存）';
     Array.prototype.forEach.call(document.querySelectorAll('.drive-folder-name'), function (el) { el.textContent = label; });
     var ln = document.getElementById('lib-name');
-    if (ln) ln.textContent = driveCfg.folderId ? ('フォルダ: ' + (driveCfg.folderName || driveCfg.folderId)) : '（フォルダ未選択）';
+    if (ln) ln.textContent = driveCfg.folderId ? ('フォルダ: ' + (driveCfg.folderName || driveCfg.folderId)) : '（フォルダ未設定。「設定」で指定）';
     var a = document.getElementById('lib-folder-link');
     if (a) { a.hidden = !driveCfg.folderLink; if (driveCfg.folderLink) a.href = driveCfg.folderLink; }
   }
@@ -1746,6 +1757,7 @@ function greet(name) {
     setStatus(driveReady() ? 'Google Drive の設定を保存しました' : 'クライアントIDとAPIキーの両方が必要です');
     libRefreshButtons();
     if (driveReady()) closeDriveSettings();
+    if (!tmDlg.hidden) tmRefresh();
   });
   document.getElementById('gd-folder-clear').addEventListener('click', function () { setDriveFolder('', ''); });
   document.getElementById('gd-connect').addEventListener('click', function () {
@@ -2479,7 +2491,7 @@ function greet(name) {
       e.className = 'empty';
       e.textContent = lib.files.length ? '一致するファイルがありません'
         : !driveReady() ? '「Drive設定」でクライアントIDとAPIキーを入れてください'
-        : !driveCfg.folderId ? '「フォルダ」でチームのフォルダを選んでください'
+        : !driveCfg.folderId ? '「設定」でフォルダ（URL）を指定してください'
         : !lib.loaded ? 'Google Drive に接続してください'
         : (driveCfg.scope === 'full' ? 'このフォルダに .md がありません' : 'このフォルダに、このツールから見える .md がありません（「ファイルを追加」で加えるか、Drive設定で権限を drive にする）');
       libListEl.appendChild(e);
@@ -2527,7 +2539,7 @@ function greet(name) {
     libConnectEl.hidden = connected || !driveReady();
     document.getElementById('lib-connect-msg').textContent = driveCfg.folderId
       ? 'Google に接続すると「' + (driveCfg.folderName || 'フォルダ') + '」の一覧を読み込みます'
-      : 'Google に接続して、チームのフォルダを選んでください';
+      : 'Google に接続し、「設定」でフォルダを指定してください';
     var title = document.querySelector('.lib-title');
     title.textContent = 'Google Drive' + (lib.user ? '　' + (lib.user.displayName || lib.user.emailAddress || '') : '');
     title.title = lib.user && lib.user.emailAddress ? lib.user.emailAddress : '';
@@ -2701,7 +2713,7 @@ function greet(name) {
     if (!lib.user) {
       // 第5版: 名前を取ったあとに名簿で役割を判定してから一覧を読む（名簿に無ければ接続を解除）
       driveWhoAmI().then(function (u) { lib.user = u; libRefreshButtons(); return teamAfterLogin(); })
-        .then(function (ok) { if (ok) teamStart(); });
+        .then(function (ok) { if (ok) teamStart(); if (!tmDlg.hidden) tmRefresh(); });
     } else if (!teamMode || role) {
       teamStart();
     }
@@ -2719,7 +2731,7 @@ function greet(name) {
     if (libFolderId() && !lib.loaded && !lib.loading) {
       libReload().then(restoreCurrent);
     } else if (!libFolderId()) {
-      setStatus('接続しました。「フォルダ」でチームのフォルダを選んでください');
+      setStatus('接続しました。「設定」でフォルダ（URL）を指定してください');
     }
   }
   function libConnected() { onDriveToken(); return Promise.resolve(); }
@@ -3428,23 +3440,32 @@ function greet(name) {
     if (!teamMode && !role) { role = 'master'; applyRole(); }
   }
   function teamAfterLogin() {
-    if (!teamMode) { role = 'master'; applyRole(); gateHide(); return Promise.resolve(true); }
-    return teamLoad().then(function () {
-      role = teamRoleOf(lib.user && lib.user.emailAddress);
-      if (!role) {
-        var mail = (lib.user && lib.user.emailAddress) || '';
-        teamDeny('このアカウント（' + mail + '）は登録されていません。管理者（マスター）に登録を依頼してください');
-        return false;
-      }
-      applyRole();
-      gateHide();
-      teamRenderDrives();
-      setStatus('接続しました（' + ROLE_LABEL[role] + '）');
-      return true;
-    }, function (e) {
+    if (!teamMode) {
+      // md2pdf-config.json に masters が無いとき: ルートフォルダの名簿にマスターがいれば、その名簿で制限する（設定で登録した場合）
+      var legacy = function () { role = 'master'; applyRole(); gateHide(); teamRenderDrives(); return true; };
+      if (!driveCfg.folderId) return Promise.resolve(legacy());
+      return teamLoad().then(function () {
+        if (team.users.some(function (u) { return u.role === 'master'; })) { teamMode = true; return teamResolveRole(); }
+        return legacy();
+      }, function () { return legacy(); });
+    }
+    return teamLoad().then(teamResolveRole, function (e) {
       teamDeny('名簿（' + TEAM_FILE + '）を読めませんでした: ' + ((e && e.message) || e));
       return false;
     });
+  }
+  function teamResolveRole() {
+    role = teamRoleOf(lib.user && lib.user.emailAddress);
+    if (!role) {
+      var mail = (lib.user && lib.user.emailAddress) || '';
+      teamDeny('このアカウント（' + mail + '）は登録されていません。管理者（マスター）に登録を依頼してください');
+      return false;
+    }
+    applyRole();
+    gateHide();
+    teamRenderDrives();
+    setStatus('接続しました（' + ROLE_LABEL[role] + '）');
+    return true;
   }
   function teamDeny(msg) {
     role = '';
@@ -3462,8 +3483,8 @@ function greet(name) {
   var ROLE_LABEL = { master: 'マスター', user: 'ユーザー', client: 'クライアント（提案モード）' };
   var ROLE_HIDE = {
     master: [],
-    user: ['#btn-users', '#lib-pick', '#rv-grp'],
-    client: ['#btn-users', '#btn-new', '#btn-open', '#btn-open-drive', '#btn-rollback', '#btn-table-png', '#btn-md-pane', '#btn-drive-settings', '#lib-pick', '#lib-new', '#lib-add-drive', '#rv-grp']
+    user: ['#btn-users', '#rv-grp'],
+    client: ['#btn-users', '#btn-new', '#btn-open', '#btn-open-drive', '#btn-rollback', '#btn-table-png', '#btn-md-pane', '#btn-drive-settings', '#lib-new', '#lib-add-drive', '#rv-grp']
   };
   function applyRole() {
     document.body.setAttribute('data-role', role || '');
@@ -3472,8 +3493,9 @@ function greet(name) {
     Object.keys(all).forEach(function (sel) {
       var el = document.querySelector(sel);
       if (!el) return;
-      var hide = role ? ROLE_HIDE[role].indexOf(sel) >= 0 : (teamMode && sel !== '#btn-drive-settings');
-      if (sel === '#btn-users') hide = !(role === 'master' && teamMode);
+      var hide = role ? ROLE_HIDE[role].indexOf(sel) >= 0 : teamMode;
+      if (sel === '#btn-users') hide = !!role && role !== 'master';   // 設定は、接続前でも、マスター（制限なしのときは全員）に出す
+      if (sel === '#btn-drive-settings') { el.hidden = true; return; }   // 接続の設定は「設定」から開く
       if (sel === '#rv-grp') { el.hidden = role !== 'master' || !rvMarks().length; return; }
       if (sel === '#lib-add-drive') { if (hide) el.hidden = true; return; }   // 出すかどうかは libRefreshButtons が決める
       el.hidden = hide;
@@ -3550,16 +3572,81 @@ function greet(name) {
   }
 
   /* --- ユーザーとドライブの管理（ダイアログ） --- */
-  var tmWork = null;   // { users: [], drives: [] } 編集中の控え
+  var tmWork = null;   // { users: [], drives: [] } 編集中の控え（接続していない／マスターでないときは null）
+  function tmSt(msg) { document.getElementById('tm-state').textContent = msg || ''; }
   function openTeamDlg() {
-    if (role !== 'master') return;
-    tmWork = { users: team.users.map(function (u) { return { email: u.email, name: u.name, role: u.role, drives: (u.drives || []).slice() }; }), drives: team.drives.map(function (d) { return { id: d.id, name: d.name }; }) };
-    document.getElementById('tm-state').textContent = '';
-    document.getElementById('tm-root').textContent = driveCfg.folderId ? (driveCfg.folderName || driveCfg.folderId) : '（未設定）';
-    tmRender();
+    if (role && role !== 'master') return;
+    tmSt('');
     tmDlg.hidden = false;
-    document.getElementById('tm-drive-url').focus();
+    tmRefresh();
   }
+  // 接続の状態・ルートフォルダ・名簿の編集欄を、今の状態に合わせる
+  function tmRefresh() {
+    var connected = libConnectedNow();
+    var st = document.getElementById('tm-conn-state');
+    st.textContent = connected ? ('接続中' + (lib.user && lib.user.emailAddress ? '（' + lib.user.emailAddress + '）' : '')) : (driveReady() ? '未接続' : 'クライアントID・APIキーが未入力です');
+    document.getElementById('tm-connect').hidden = connected;
+    document.getElementById('tm-root').textContent = driveCfg.folderId ? (driveCfg.folderName || driveCfg.folderId) : '（未設定）';
+    var msg = document.getElementById('tm-roster-msg');
+    var box = document.getElementById('tm-roster');
+    var why = !driveReady() ? '先に「接続の設定」でクライアントIDとAPIキーを入れてください。'
+      : !connected ? '「Google Drive に接続」を押すと、ドライブとユーザーの設定ができます。'
+      : !driveCfg.folderId ? 'ルートフォルダの URL を入れて「URLで設定」を押すと、ドライブとユーザーの設定ができます。'
+      : (role && role !== 'master') ? 'ドライブとユーザーの設定はマスターだけができます。' : '';
+    if (why) { tmWork = null; box.hidden = true; msg.hidden = false; msg.textContent = why; return Promise.resolve(); }
+    msg.hidden = true; box.hidden = false;
+    var ready = team.loaded ? Promise.resolve() : teamLoad().catch(function (e) { tmSt('名簿を読めませんでした: ' + ((e && e.message) || e)); });
+    return ready.then(function () {
+      if (tmDlg.hidden) return;
+      tmWork = { users: team.users.map(function (u) { return { email: u.email, name: u.name, role: u.role, drives: (u.drives || []).slice() }; }), drives: team.drives.map(function (d) { return { id: d.id, name: d.name }; }) };
+      // まだマスターがいない（制限なし）ときは、いま接続している自分を最初のマスターにする
+      var me = lib.user && lowerMail(lib.user.emailAddress);
+      if (me && !teamMode && !tmWork.users.some(function (u) { return u.role === 'master'; }) && !tmWork.users.some(function (u) { return u.email === me; })) {
+        tmWork.users.unshift({ email: me, name: myName(), role: 'master', drives: [] });
+        tmSt('あなたを最初のマスターに入れました。「保存」で、名簿に無いアカウントを接続できなくします');
+      }
+      tmRender();
+    });
+  }
+  document.getElementById('tm-connect').addEventListener('click', function () {
+    if (!driveReady()) { openDriveSettings(); return; }
+    tmSt('Google に接続中...');
+    getToken('').then(function () { tmSt(''); }, function (e) { tmSt((e && e.message) || String(e)); }).then(function () { tmRefresh(); });
+  });
+  // ルートフォルダを URL で指定
+  document.getElementById('tm-root-set').addEventListener('click', function () {
+    var inp = document.getElementById('tm-root-url');
+    var id = driveIdFromUrl(inp.value);
+    if (!id) { tmSt('フォルダの URL（https://drive.google.com/drive/folders/…）または ID を入れてください'); return; }
+    if (!libConnectedNow()) { tmSt('先に「Google Drive に接続」してください'); return; }
+    tmSt('フォルダを確認中...');
+    driveGetMeta(id, 'id,name,mimeType').then(function (j) {
+      if (!j || !j.id) throw new Error('見つかりません');
+      if (j.mimeType !== 'application/vnd.google-apps.folder') throw new Error('フォルダではありません: ' + j.name);
+      inp.value = '';
+      setDriveFolder(j.id, j.name);
+      team.loaded = false; team.users = []; team.drives = []; team.fileId = '';
+      lib.current = null; lib.loadedText = null; persistCurrent();
+      lib.loaded = false;
+      tmSt('ルートフォルダを設定しました: ' + j.name);
+      return libReload().then(function () { return tmRefresh(); });
+    }).catch(function (e) { tmSt('このフォルダは設定できません（' + ((e && e.message) || e) + '）。URL と、あなたに閲覧権限があるかを確認してください'); });
+  });
+  document.getElementById('tm-root-url').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tm-root-set').click(); } });
+  // 取り込み: 一覧を読み直す（名簿も読み直す）
+  document.getElementById('tm-import').addEventListener('click', function () {
+    if (!driveReady()) { openDriveSettings(); return; }
+    if (!libConnectedNow()) { tmSt('先に「Google Drive に接続」してください'); return; }
+    if (!libFolderId()) { tmSt('先にルートフォルダの URL を設定してください'); return; }
+    tmSt('取り込み中...');
+    team.loaded = false;
+    teamLoad().catch(function () { /* 名簿が無くても一覧は読む */ }).then(function () {
+      teamRenderDrives();
+      lib.loaded = false;
+      return libReload();
+    }).then(function () { tmSt('取り込みました（' + lib.files.length + ' ファイル）'); return tmRefresh(); })
+      .catch(function (e) { tmSt('取り込めませんでした: ' + ((e && e.message) || e)); });
+  });
   document.getElementById('tm-conn').addEventListener('click', function () { openDriveSettings(); });
   function closeTeamDlg() { tmDlg.hidden = true; tmWork = null; }
   function tmRender() {
@@ -3628,6 +3715,7 @@ function greet(name) {
     });
   }
   document.getElementById('tm-add').addEventListener('click', function () {
+    if (!tmWork) return;
     var email = lowerMail(document.getElementById('tm-email').value);
     var name = document.getElementById('tm-name').value.trim();
     var r = document.getElementById('tm-role').value;
@@ -3641,7 +3729,7 @@ function greet(name) {
   });
   document.getElementById('tm-email').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tm-add').click(); } });
   function tmAddDrive(f) {
-    if (!f) return;
+    if (!f || !tmWork) return;
     if (tmWork.drives.some(function (d) { return d.id === f.id; })) { document.getElementById('tm-state').textContent = 'すでに追加されています: ' + f.name; return; }
     tmWork.drives.push({ id: f.id, name: f.name || f.id });
     document.getElementById('tm-state').textContent = 'ドライブを追加しました: ' + (f.name || f.id) + '（「保存」で確定）';
@@ -3655,6 +3743,7 @@ function greet(name) {
     var st = document.getElementById('tm-state');
     var inp = document.getElementById('tm-drive-url');
     var id = driveIdFromUrl(inp.value);
+    if (!tmWork) return;
     if (!id) { st.textContent = 'フォルダの URL（https://drive.google.com/drive/folders/…）または ID を入れてください'; return; }
     st.textContent = 'フォルダを確認中...';
     driveGetMeta(id, 'id,name,mimeType').then(function (j) {
@@ -3683,6 +3772,11 @@ function greet(name) {
     if (!tmWork) return;
     var btn = this;
     var st = document.getElementById('tm-state');
+    var myMail = lib.user ? lowerMail(lib.user.emailAddress) : '';
+    var hasMaster = teamMasters.length > 0 || tmWork.users.some(function (u) { return u.role === 'master'; });
+    var meMaster = !myMail || teamMasters.indexOf(myMail) >= 0 || tmWork.users.some(function (u) { return u.email === myMail && u.role === 'master'; });
+    if (tmWork.users.length && !hasMaster) { st.textContent = 'マスターを1人以上にしてください'; return; }
+    if (tmWork.users.length && !meMaster) { st.textContent = 'あなた自身（' + myMail + '）はマスターのままにしてください（外すと設定を変えられなくなります）'; return; }
     var share = document.getElementById('tm-share').checked;
     var jobs = [];
     if (share) {
@@ -3713,6 +3807,10 @@ function greet(name) {
         });
       }, Promise.resolve());
     }).then(function () {
+      // 名簿にマスターがいれば、ここから先は名簿に載っているアカウントだけが接続できる
+      teamMode = teamMasters.length > 0 || team.users.some(function (u) { return u.role === 'master'; });
+      role = teamMode ? (teamRoleOf(myMail) || 'master') : 'master';
+      applyRole();
       teamRenderDrives();
       libRefreshButtons();
       if (!tmWork.drives.some(function (d) { return d.id === teamDriveSel(); })) { lib.loaded = false; }
