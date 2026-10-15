@@ -209,6 +209,34 @@
   #lib-ver-list li.empty { color: var(--muted); }
   #btn-update.dirty::after { content: ' ●'; }
 
+  /* ---------- 追加分（第4版）: プレビュー（PDFの見た目）だけで編集。Markdown 欄は既定で隠す ---------- */
+  main.md-hidden { grid-template-columns: 1fr; }
+  main.md-hidden.lib-open { grid-template-columns: 300px 1fr; }
+  main.md-hidden #md-pane { display: none; }
+  #btn-md-pane.on { border-color: var(--accent); color: var(--accent); }
+  .edit-bar { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; padding: 6px 12px; }
+  .edit-bar .grp { display: inline-flex; gap: 2px; align-items: center; padding-right: 6px; margin-right: 2px; border-right: 1px solid var(--border); }
+  .edit-bar .grp:last-of-type { border-right: 0; }
+  .edit-bar button, .edit-bar select { font-size: 12px; padding: 3px 8px; }
+  .edit-bar button.b { font-weight: 700; }
+  .edit-bar button.i { font-style: italic; }
+  .edit-bar button.s { text-decoration: line-through; }
+  .edit-bar .hint { font-size: 11px; color: var(--muted); margin-left: auto; }
+  @media screen {
+    #preview [data-md] { cursor: pointer; }
+    #preview .page-break { cursor: default; }
+  }
+  .atom-src {
+    width: 100%; min-height: 9em; resize: vertical; font-family: "Noto Sans Mono", ui-monospace, monospace; font-size: 13px;
+    line-height: 1.6; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--editor-bg); color: var(--text);
+  }
+  .atom-view { background: #ffffff; color: #111111; border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; min-height: 3em; max-height: 40vh; overflow: auto; }
+  @media (max-width: 800px) {
+    main.md-hidden { grid-template-rows: 1fr; }
+    main.md-hidden.lib-open { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .edit-bar .hint { display: none; }
+  }
+
   /* ---------- 追加分: ダイアログ・浮きボタン・表PNG・画像差し替え ---------- */
   .preview-wrap { position: relative; }
   .fab {
@@ -295,6 +323,7 @@
   <button type="button" id="btn-rollback" disabled title="1つ前の版に戻す">Rollback</button>
   <button type="button" id="btn-save" title="Markdown と PDF をファイルに書き出す（ファイル名の末尾に _yyyymmdd）。このパソコンにダウンロード、または Drive に日付付きのコピー">書き出し</button>
   <button type="button" id="btn-table-png" title="プレビューの表を画像（PNG）にします">表をPNG保存</button>
+  <button type="button" id="btn-md-pane" title="上級者向け: 保存される Markdown を左に表示して直接編集する（もう一度押すと隠す）">Markdown</button>
   <label class="field">用紙
     <select id="page-size">
       <option value="A4" selected>A4</option>
@@ -318,7 +347,7 @@
   <input type="file" id="img-input" accept="image/*" hidden>
 </header>
 
-<main>
+<main class="md-hidden">
   <aside id="lib" class="pane lib no-print" hidden>
     <div class="pane-head lib-head">
       <span class="lib-title">Google Drive</span>
@@ -344,12 +373,59 @@
       <ul id="lib-ver-list"><li class="empty">ファイルを選ぶと履歴が出ます</li></ul>
     </div>
   </aside>
-  <section class="pane no-print">
-    <div class="pane-head">Markdown（編集可）</div>
+  <section id="md-pane" class="pane no-print">
+    <div class="pane-head">Markdown（上級者向け。保存されるデータ）</div>
     <textarea id="md" spellcheck="false" aria-label="Markdown"></textarea>
   </section>
   <section class="pane">
-    <div class="pane-head no-print">プレビュー = PDFの見た目（直接編集可。数式・図・目次はMarkdown側で編集）</div>
+    <div class="pane-head edit-bar no-print" id="edit-bar" role="toolbar" aria-label="書式">
+      <span class="grp">
+        <select id="ed-block" title="段落の種類">
+          <option value="p">本文</option>
+          <option value="h1">見出し1</option>
+          <option value="h2">見出し2</option>
+          <option value="h3">見出し3</option>
+          <option value="h4">見出し4</option>
+        </select>
+      </span>
+      <span class="grp">
+        <button type="button" class="b" data-cmd="bold" title="太字（Ctrl+B）">B</button>
+        <button type="button" class="i" data-cmd="italic" title="斜体（Ctrl+I）">I</button>
+        <button type="button" class="s" data-cmd="strikeThrough" title="取り消し線">S</button>
+        <button type="button" id="ed-link" title="選んだ文字にリンクを付ける">リンク</button>
+      </span>
+      <span class="grp">
+        <button type="button" data-cmd="insertUnorderedList" title="箇条書き">箇条書き</button>
+        <button type="button" data-cmd="insertOrderedList" title="番号付きリスト">番号</button>
+        <button type="button" id="ed-quote" title="引用">引用</button>
+      </span>
+      <span class="grp">
+        <button type="button" id="ed-table" title="カーソルの位置に表を入れる（3列×2行）">表を挿入</button>
+        <button type="button" id="ed-row-add" title="カーソルのある行の下に行を足す">行+</button>
+        <button type="button" id="ed-row-del" title="カーソルのある行を消す">行-</button>
+        <button type="button" id="ed-col-add" title="カーソルのある列の右に列を足す">列+</button>
+        <button type="button" id="ed-col-del" title="カーソルのある列を消す">列-</button>
+        <button type="button" id="ed-table-del" title="カーソルのある表を消す">表を削除</button>
+      </span>
+      <span class="grp">
+        <select id="ed-insert" title="部品を挿入">
+          <option value="">挿入...</option>
+          <option value="math-block">数式（独立）</option>
+          <option value="math-inline">数式（文中）</option>
+          <option value="mermaid">図（Mermaid）</option>
+          <option value="code">コード</option>
+          <option value="NOTE">注意書き（注記）</option>
+          <option value="TIP">注意書き（ヒント）</option>
+          <option value="IMPORTANT">注意書き（重要）</option>
+          <option value="WARNING">注意書き（警告）</option>
+          <option value="CAUTION">注意書き（注意）</option>
+          <option value="toc">目次</option>
+          <option value="hr">区切り線</option>
+          <option value="page-break">改ページ</option>
+        </select>
+      </span>
+      <span class="hint">数式・図・目次はクリックで編集。保存（Update／書き出し）のときに Markdown に変換します</span>
+    </div>
     <div class="preview-wrap">
       <article id="preview" class="markdown-body" contenteditable="true" aria-label="プレビュー"></article>
       <button type="button" id="tpng-fab" class="fab no-print" hidden>この表をPNG保存</button>
@@ -439,20 +515,38 @@
   </div>
 </div>
 
+<!-- 数式・図・目次などの部品の編集（第4版） -->
+<div id="atom-dlg" class="dlg no-print" hidden>
+  <div class="dlg-panel narrow" role="dialog" aria-label="部品の編集">
+    <div class="dlg-bar"><strong id="atom-title">部品の編集</strong><span class="spacer"></span><button type="button" id="atom-close">閉じる</button></div>
+    <div class="dlg-body">
+      <textarea id="atom-src" class="atom-src" spellcheck="false" aria-label="部品の中身"></textarea>
+      <div class="muted">表示の確認</div>
+      <div id="atom-view" class="atom-view markdown-body"></div>
+      <p class="dlg-hint" id="atom-hint"></p>
+      <div class="row right">
+        <button type="button" id="atom-delete">この部品を削除</button>
+        <span class="spacer"></span>
+        <button type="button" id="atom-apply" class="primary">反映</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script type="text/plain" id="sample"># サンプル文書
 
 [TOC]
 
-このツールは **Markdown** と **プレビュー** を双方向に同期します。左右どちらを編集しても、もう片方に反映されます。
+このページは、PDFになる見た目のまま文書を直接編集できます。保存（Update／書き出し）のときに Markdown に変換して Google Drive に保管し、PDF はダウンロード用に書き出します。
 
 ## 使い方
 
-1. 左のMarkdown欄を編集する
-2. または右のプレビューを直接編集する
-3. 「PDF出力（印刷）」で保存先に「PDFに保存」を選ぶ
+1. この画面の文字をそのままクリックして書き換える
+2. 見出し・太字・箇条書き・表などは、上の書式ボタンで付ける
+3. 「Update」で Google Drive に保存、「書き出し」で Markdown と PDF をダウンロード
 
 > [!TIP]
-> 数式・図・目次はプレビュー上では編集できない部品です。左のMarkdown側で編集してください。
+> 数式・図・目次はクリックすると編集画面が開きます。新しく入れるときは上の「挿入...」から選びます。
 
 ## 数式
 
@@ -498,7 +592,7 @@ function greet(name) {
 
 ## 2ページ目
 
-- [x] 双方向同期
+- [x] 見た目のまま編集
 - [x] 数式・図・コードの色分け
 - [ ] PDF出力
 </script>
@@ -1016,20 +1110,27 @@ function greet(name) {
   }
 
   function syncFromPreview() {
-    mdEl.value = htmlToMd(pvEl.innerHTML);
+    pvPending = false;
+    mdEl.value = htmlToMd(previewHtmlForSave());
     storageSet();
-    setStatus('同期済み（プレビュー → Markdown ' + nowLabel() + '）');
+    setStatus('Markdown に変換しました（' + nowLabel() + '）');
   }
 
   var mdSync = debounce(syncFromMarkdown, 250);
   var pvSync = debounce(syncFromPreview, 300);
 
+  // 第4版: プレビューの編集は、保存（Update・書き出し・新規・印刷など）のときにまとめて Markdown に変換する
+  var pvPending = false;
+  function mdPaneOpen() { return !document.querySelector('main').classList.contains('md-hidden'); }
+
   function flushAll() {
     mdSync.flush();
     pvSync.flush();
+    if (pvPending) syncFromPreview();
   }
 
   function setContent(md) {
+    pvPending = false;
     mdEl.value = md;
     syncFromMarkdown();
   }
@@ -1040,12 +1141,20 @@ function greet(name) {
   });
 
   pvEl.addEventListener('input', function () {
-    setStatus('編集中...');
-    pvSync();
+    if (mdPaneOpen()) {
+      setStatus('編集中...');
+      pvSync();
+      return;
+    }
+    pvPending = true;
+    setStatus('編集中（保存のときに Markdown に変換します）');
   });
 
-  // プレビュー編集の確定時に、Markdownから再描画して両者を完全に一致させる
-  pvEl.addEventListener('blur', function () {
+  // Markdown 欄を出しているときだけ: プレビュー編集の確定時に、Markdownから再描画して両者を完全に一致させる
+  pvEl.addEventListener('blur', function (e) {
+    if (!mdPaneOpen()) return;
+    var to = e.relatedTarget;
+    if (to && to.closest && to.closest('#edit-bar, #atom-dlg')) return;
     pvSync.flush();
     renderPreview(mdEl.value);
   });
@@ -1186,12 +1295,12 @@ function greet(name) {
   saveNameEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); doSave(); } });
 
   document.getElementById('btn-new').addEventListener('click', function () {
-    if (mdEl.value && !confirm('現在の内容を破棄して新規作成しますか？')) return;
+    if ((mdEl.value || pvPending) && !confirm('現在の内容を破棄して新規作成しますか？')) return;
     fileBase = '';
     driveFileId = '';
     libSelect(null);
     setContent('');
-    mdEl.focus();
+    if (mdPaneOpen()) mdEl.focus(); else pvEl.focus();
   });
 
   // ドラッグ＆ドロップで.mdを開く
@@ -1813,7 +1922,7 @@ function greet(name) {
     setStatus('PNGを生成中...');
     var prep = tpngDest() === 'drive' ? ensureDriveFolder() : Promise.resolve();
     prep.then(function () { return saveTablePng(tpngIndex, tpngName.value); })
-      .then(function (fname) { setStatus((tpngDest() === 'drive' ? 'Google Drive の images に保存しました: ' : 'PNGを保存しました: ') + fname); if (tpngDest() === 'drive' && mdEl.value) renderPreview(mdEl.value); })
+      .then(function (fname) { setStatus((tpngDest() === 'drive' ? 'Google Drive の images に保存しました: ' : 'PNGを保存しました: ') + fname); if (tpngDest() === 'drive') { flushAll(); if (mdEl.value) renderPreview(mdEl.value); } })
       .catch(function (e) { setStatus('PNGを保存できませんでした: ' + ((e && e.message) || e)); })
       .then(function () { btn.disabled = false; });
   });
@@ -2027,7 +2136,8 @@ function greet(name) {
 
   function closeAnyDialog() {
     var closed = false;
-    if (!imgDlg.hidden) { closeImgDlg(); closed = true; }
+    if (!atomDlg.hidden) { closeAtomDlg(); closed = true; }
+    else if (!imgDlg.hidden) { closeImgDlg(); closed = true; }
     else if (!gdDlg.hidden) { closeDriveSettings(); closed = true; }
     else if (!saveDlg.hidden) { closeSaveDlg(); closed = true; }
     else if (!tpngEl.hidden) { closeTablePng(); closed = true; }
@@ -2059,7 +2169,7 @@ function greet(name) {
     return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
   }
   function fmtSize(n) { n = Number(n) || 0; return n < 1024 ? n + ' B' : Math.round(n / 1024) + ' KB'; }
-  function isDirty() { return !!(lib.current && lib.loadedText !== null && mdEl.value !== lib.loadedText); }
+  function isDirty() { return !!(lib.current && lib.loadedText !== null && (pvPending || mdEl.value !== lib.loadedText)); }
   function libConnectedNow() { return !!driveToken && Date.now() < driveTokenExp - 60000; }
 
   // IndexedDB（開いているファイルと、その読み込み時の内容を覚えておく。再読み込み後に続きから編集できる）
@@ -2372,6 +2482,7 @@ function greet(name) {
       libRenderList();
       libRefreshButtons();
       if (!quiet) setStatus('一覧: ' + files.length + ' ファイル');
+      flushAll();
       if (mdEl.value) renderPreview(mdEl.value);
     }).catch(function (e) {
       lib.loading = false;
@@ -2619,6 +2730,490 @@ function greet(name) {
     libRenderList();
     loadTeamConfig().then(function () { libRenderList(); });
   })();
+
+  /* ---------- 第4版: プレビュー（PDFの見た目）で編集する。Markdown は保存のときに作る ---------- */
+  var MD_PANE_KEY = 'md2pdf:mdpane';
+  var mainEl = document.querySelector('main');
+  var btnMdPane = document.getElementById('btn-md-pane');
+  var editBar = document.getElementById('edit-bar');
+  var edBlock = document.getElementById('ed-block');
+  var edInsert = document.getElementById('ed-insert');
+  var edRange = null;   // プレビューの中で最後に選んでいた位置（ボタンや一覧を押しても失わないように）
+
+  // 上級者向け: Markdown 欄を出す／隠す（既定は隠す）
+  function setMdPane(open) {
+    if (open) flushAll();       // 出す前に、プレビューの編集を Markdown にしておく
+    else mdSync.flush();        // 隠す前に、Markdown 欄の編集をプレビューに反映しておく
+    mainEl.classList.toggle('md-hidden', !open);
+    btnMdPane.classList.toggle('on', open);
+    btnMdPane.textContent = open ? 'Markdownを隠す' : 'Markdown';
+    try { localStorage.setItem(MD_PANE_KEY, open ? '1' : '0'); } catch (e) { /* ignore */ }
+  }
+  btnMdPane.addEventListener('click', function () { setMdPane(!mdPaneOpen()); });
+  (function () {
+    var v = '0';
+    try { v = localStorage.getItem(MD_PANE_KEY) || '0'; } catch (e) { /* ignore */ }
+    if (v === '1') setMdPane(true);
+  })();
+
+  // 保存用の HTML: ブラウザが編集中に入れる目印（空のセル・段落の末尾の <br>、書式なしの span）を除く
+  function unwrapNode(el) {
+    var parent = el.parentNode;
+    while (el.firstChild) parent.insertBefore(el.firstChild, el);
+    parent.removeChild(el);
+  }
+  function previewHtmlForSave() {
+    var c = pvEl.cloneNode(true);
+    Array.prototype.forEach.call(c.querySelectorAll('span[style]'), function (sp) {
+      if (!sp.closest('[data-md]') && !sp.className) unwrapNode(sp);
+    });
+    Array.prototype.forEach.call(c.querySelectorAll('p > br:last-child, li > br:last-child, td > br:last-child, th > br:last-child, h1 > br:last-child, h2 > br:last-child, h3 > br:last-child, h4 > br:last-child'), function (br) {
+      var n = br.nextSibling;
+      while (n && n.nodeType === 3 && !n.nodeValue.trim()) n = n.nextSibling;
+      if (!n && !br.closest('[data-md]')) br.parentNode.removeChild(br);
+    });
+    // 中身のない箇条書きの項目（Enter を押しただけの行）は除く
+    Array.prototype.forEach.call(c.querySelectorAll('li'), function (li) {
+      if (!li.textContent.trim() && !li.querySelector('img, [data-md], input, table')) li.parentNode.removeChild(li);
+    });
+    Array.prototype.forEach.call(c.querySelectorAll('ul, ol'), function (l) {
+      if (!l.querySelector('li')) l.parentNode.removeChild(l);
+    });
+    return c.innerHTML;
+  }
+
+  // タブを閉じる・隠すときは、未変換の編集を Markdown にして自動保存（localStorage）に残す
+  window.addEventListener('pagehide', function () { if (pvPending) syncFromPreview(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden' && pvPending) syncFromPreview();
+  });
+
+  /* --- 選択位置 --- */
+  function closestIn(node, selector) {
+    var el = node && node.nodeType !== 1 ? node.parentNode : node;
+    var hit = el && el.closest ? el.closest(selector) : null;
+    return hit && pvEl.contains(hit) && hit !== pvEl ? hit : null;
+  }
+  function edSyncBlock() {
+    var b = edRange ? closestIn(edRange.startContainer, 'h1, h2, h3, h4, p') : null;
+    var v = b ? b.nodeName.toLowerCase() : 'p';
+    edBlock.value = /^(p|h1|h2|h3|h4)$/.test(v) ? v : 'p';
+  }
+  document.addEventListener('selectionchange', function () {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    var r = sel.getRangeAt(0);
+    if (!pvEl.contains(r.commonAncestorContainer)) return;
+    edRange = r.cloneRange();
+    edSyncBlock();
+  });
+  function edRestore() {
+    var cur = window.getSelection();
+    if (document.activeElement === pvEl && cur && cur.rangeCount && pvEl.contains(cur.getRangeAt(0).commonAncestorContainer)) {
+      edRange = cur.getRangeAt(0).cloneRange();
+      return true;   // 選択がそのまま残っているときは触らない
+    }
+    if (!edRange || !pvEl.contains(edRange.startContainer)) return false;
+    pvEl.focus();
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(edRange);
+    return true;
+  }
+  function edChanged() { pvEl.dispatchEvent(new Event('input', { bubbles: true })); }
+  function edCaretTo(el, selectAll) {
+    if (!el) return;
+    var r = document.createRange();
+    r.selectNodeContents(el);
+    if (!selectAll) r.collapse(true);
+    pvEl.focus();
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    edRange = r.cloneRange();
+  }
+  function edInBlocked() {
+    return edRange && closestIn(edRange.startContainer, 'td, th, pre, [data-md]');
+  }
+
+  // ボタンを押してもプレビューの選択が外れないように
+  editBar.addEventListener('mousedown', function (e) {
+    edCapture();
+    if (e.target.closest && e.target.closest('button')) e.preventDefault();
+  }, true);
+  // 書式ボタン・選択肢を使う直前に、いまの選択位置を取り直す（selectionchange が遅れて届くことがあるため）
+  function edCapture() {
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount && pvEl.contains(sel.getRangeAt(0).commonAncestorContainer)) edRange = sel.getRangeAt(0).cloneRange();
+  }
+  editBar.addEventListener('change', edCapture, true);
+  editBar.addEventListener('click', edCapture, true);
+
+  /* --- 書式 --- */
+  // 選択位置を「文書の先頭から何文字目か」で覚えて戻す（箇条書き・見出しにするとブラウザがカーソルを行頭に動かすため）
+  function edOffsetOf(container, offset) {
+    var r = document.createRange();
+    r.setStart(pvEl, 0);
+    r.setEnd(container, offset);
+    return r.toString().length;
+  }
+  function edPointAt(pos) {
+    var w = document.createTreeWalker(pvEl, NodeFilter.SHOW_TEXT, null);
+    var n, last = null;
+    while ((n = w.nextNode())) {
+      if (pos <= n.nodeValue.length) return { node: n, offset: pos };
+      pos -= n.nodeValue.length;
+      last = n;
+    }
+    return last ? { node: last, offset: last.nodeValue.length } : { node: pvEl, offset: 0 };
+  }
+  function edExec(cmd, val) {
+    if (!edRestore()) { setStatus('先に文書の中をクリックしてください'); return false; }
+    var sel = window.getSelection();
+    var r0 = sel.getRangeAt(0);
+    var s = edOffsetOf(r0.startContainer, r0.startOffset), e = edOffsetOf(r0.endContainer, r0.endOffset);
+    document.execCommand(cmd, false, val);
+    try {
+      var a = edPointAt(s), z = edPointAt(e);
+      var r = document.createRange();
+      r.setStart(a.node, a.offset);
+      r.setEnd(z.node, z.offset);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      edRange = r.cloneRange();
+    } catch (err) { /* そのまま */ }
+    edChanged();
+    return true;
+  }
+  Array.prototype.forEach.call(editBar.querySelectorAll('button[data-cmd]'), function (b) {
+    b.addEventListener('click', function () {
+      var cmd = b.getAttribute('data-cmd');
+      if (/List$/.test(cmd) && edInBlocked()) { setStatus('表・コード・部品の中では箇条書きにできません'); return; }
+      edExec(cmd);
+    });
+  });
+  edBlock.addEventListener('change', function () {
+    if (edInBlocked()) { setStatus('表・コード・部品の中では見出しにできません'); edSyncBlock(); return; }
+    edExec('formatBlock', '<' + edBlock.value + '>');
+    edSyncBlock();
+  });
+  document.getElementById('ed-quote').addEventListener('click', function () {
+    if (edInBlocked()) { setStatus('表・コード・部品の中では引用にできません'); return; }
+    var q = edRange ? closestIn(edRange.startContainer, 'blockquote') : null;
+    if (q && !q.hasAttribute('data-alert')) {
+      if (!edRestore()) return;
+      unwrapNode(q);
+      edChanged();
+      return;
+    }
+    edExec('formatBlock', '<blockquote>');
+  });
+  document.getElementById('ed-link').addEventListener('click', function () {
+    if (!edRestore()) { setStatus('先にリンクにする文字を選んでください'); return; }
+    var a = closestIn(edRange.startContainer, 'a');
+    var saved = edRange.cloneRange();
+    var url = prompt('リンク先のURL（空にするとリンクを外します）', a ? (a.getAttribute('href') || '') : 'https://');
+    if (url === null) return;
+    edRange = saved;
+    if (!edRestore()) return;
+    url = url.trim();
+    var sel = window.getSelection();
+    if (!url || url === 'https://') {
+      if (a) {
+        var r = document.createRange();
+        r.selectNodeContents(a);
+        sel.removeAllRanges();
+        sel.addRange(r);
+        document.execCommand('unlink');
+      }
+    } else if (a) {
+      a.setAttribute('href', url);
+    } else if (sel.isCollapsed) {
+      document.execCommand('insertHTML', false, '<a href="' + escapeHtml(url) + '">' + escapeHtml(url) + '</a>');
+    } else {
+      document.execCommand('createLink', false, url);
+    }
+    edChanged();
+  });
+
+  // コードの中の Enter は改行文字にする（<br> や段落にしない）
+  pvEl.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || e.isComposing || e.shiftKey) return;
+    var sel = window.getSelection();
+    var node = sel && sel.rangeCount ? sel.getRangeAt(0).startContainer : null;
+    var pre = node ? closestIn(node, 'pre') : null;
+    if (!pre) return;
+    e.preventDefault();
+    var r = sel.getRangeAt(0);
+    r.deleteContents();
+    // 末尾で改行したときは、新しい行が見えるようにもう1つ改行を足す（保存時に末尾の改行は1つ落ちる）
+    var tail = document.createRange();
+    tail.selectNodeContents(pre);
+    tail.setStart(r.endContainer, r.endOffset);
+    var atEnd = tail.toString() === '';
+    var nl = document.createTextNode(atEnd ? '\n\n' : '\n');
+    r.insertNode(nl);
+    var after = document.createRange();
+    after.setStart(nl, 1);
+    after.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(after);
+    edChanged();
+  });
+
+  /* --- 部品・表の挿入 --- */
+  function edTopBlock(node) {
+    while (node && node.parentNode !== pvEl) node = node.parentNode;
+    return node && node.parentNode === pvEl ? node : null;
+  }
+  function isEmptyBlock(el) {
+    return el && el.nodeType === 1 && /^(P|DIV|H[1-6])$/.test(el.nodeName) && !el.textContent.trim() && !el.querySelector('img, [data-md], table');
+  }
+  function edPrepare(html, inline) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    if (inline && tmp.children.length === 1 && tmp.firstElementChild.nodeName === 'P') tmp = tmp.firstElementChild;
+    lockAtomic(tmp);
+    renderMath(tmp);
+    renderCode(tmp);
+    return Array.prototype.filter.call(tmp.childNodes, function (n) {
+      return inline || n.nodeType === 1 || (n.nodeType === 3 && n.nodeValue.trim());
+    });
+  }
+  function edAfterInsert() {
+    renderToc(pvEl);
+    renderMermaid(pvEl);
+    resolveLibImages(pvEl);
+    edChanged();
+  }
+  // ブロック（表・図など）をカーソルのある段落の下に入れる。空の段落ならその段落と置き換える
+  function edInsertBlockNodes(nodes) {
+    if (!nodes.length) return null;
+    var frag = document.createDocumentFragment();
+    nodes.forEach(function (n) { frag.appendChild(n); });
+    var ref = edRange && pvEl.contains(edRange.startContainer) ? edTopBlock(edRange.startContainer) : null;
+    if (ref && isEmptyBlock(ref)) pvEl.replaceChild(frag, ref);
+    else if (ref) pvEl.insertBefore(frag, ref.nextSibling);
+    else pvEl.appendChild(frag);
+    var last = nodes[nodes.length - 1];
+    if (!last.nextElementSibling) {
+      var p = document.createElement('p');
+      p.innerHTML = '<br>';
+      pvEl.appendChild(p);
+    }
+    edAfterInsert();
+    return nodes[0];
+  }
+  function edInsertInlineNodes(nodes) {
+    if (!nodes.length) return;
+    if (!edRange || !pvEl.contains(edRange.startContainer)) {
+      var p = document.createElement('p');
+      nodes.forEach(function (n) { p.appendChild(n); });
+      edInsertBlockNodes([p]);
+      return;
+    }
+    var r = edRange.cloneRange();
+    r.collapse(false);
+    var frag = document.createDocumentFragment();
+    nodes.forEach(function (n) { frag.appendChild(n); });
+    r.insertNode(frag);
+    edAfterInsert();
+  }
+
+  var INSERT_TEMPLATES = {
+    'math-block': { atom: true, md: '$$\n\\frac{a}{b} = c\n$$' },
+    'math-inline': { atom: true, inline: true, md: '$x^2$' },
+    'mermaid': { atom: true, md: '```mermaid\nflowchart LR\n  A[開始] --> B[処理] --> C[終了]\n```' },
+    'code': { md: '```\nここにコードを書きます\n```' },
+    'toc': { md: '[TOC]' },
+    'hr': { md: '---' },
+    'page-break': { md: '<div class="page-break"></div>' }
+  };
+  edInsert.addEventListener('change', function () {
+    var key = edInsert.value;
+    edInsert.value = '';
+    if (!key) return;
+    if (edInBlocked() && key !== 'math-inline') { setStatus('表・コード・部品の中には入れられません。外側の段落をクリックしてから選んでください'); return; }
+    if (closestIn(edRange && edRange.startContainer, '[data-md], pre') && key === 'math-inline') { setStatus('コード・部品の中には入れられません'); return; }
+    var t = INSERT_TEMPLATES[key];
+    if (!t && ALERT_LABELS[key]) t = { md: '> [!' + key + ']\n> ここに本文を書きます' };
+    if (!t) return;
+    if (t.atom) { openAtomDlg(null, t.md, !!t.inline); return; }
+    var first = edInsertBlockNodes(edPrepare(mdToHtml(t.md), false));
+    // ひな形の文字は選んだ状態にして、そのまま打ち替えられるようにする
+    if (first && key === 'code') edCaretTo(first.querySelector('code') || first, true);
+    else if (first && ALERT_LABELS[key]) edCaretTo(first.querySelector('p:not(.markdown-alert-title)') || first, true);
+    setStatus('挿入しました');
+  });
+
+  /* --- 表の操作 --- */
+  function edCell() { return edRange ? closestIn(edRange.startContainer, 'td, th') : null; }
+  function newCell(tag) { return document.createElement(tag); }
+  document.getElementById('ed-table').addEventListener('click', function () {
+    if (edInBlocked()) { setStatus('表・コード・部品の中には表を入れられません'); return; }
+    var html = '<table><thead><tr><th>見出し1</th><th>見出し2</th><th>見出し3</th></tr></thead><tbody>' +
+      '<tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr></tbody></table>';
+    var table = edInsertBlockNodes(edPrepare(html, false));
+    if (table) edCaretTo(table.querySelector('th'), true);
+    setStatus('表を入れました（行・列は「行+」「列+」で増やせます）');
+  });
+  document.getElementById('ed-row-add').addEventListener('click', function () {
+    var cell = edCell();
+    if (!cell) { setStatus('表のセルをクリックしてから押してください'); return; }
+    var row = cell.parentNode, table = row.closest('table');
+    var tr = document.createElement('tr');
+    for (var i = 0; i < row.cells.length; i++) tr.appendChild(newCell('td'));
+    if (row.parentNode.nodeName === 'THEAD') {
+      var tb = table.tBodies[0] || table.appendChild(document.createElement('tbody'));
+      tb.insertBefore(tr, tb.firstChild);
+    } else {
+      row.parentNode.insertBefore(tr, row.nextSibling);
+    }
+    edCaretTo(tr.cells[cell.cellIndex] || tr.cells[0]);
+    edChanged();
+  });
+  document.getElementById('ed-row-del').addEventListener('click', function () {
+    var cell = edCell();
+    if (!cell) { setStatus('表のセルをクリックしてから押してください'); return; }
+    var row = cell.parentNode;
+    if (row.parentNode.nodeName === 'THEAD' || row.closest('table').rows[0] === row) { setStatus('見出しの行は消せません（表ごと消すときは「表を削除」）'); return; }
+    var next = row.nextElementSibling || row.previousElementSibling;
+    var table = row.closest('table');
+    row.parentNode.removeChild(row);
+    edCaretTo(next ? (next.cells[cell.cellIndex] || next.cells[0]) : table.rows[0].cells[0]);
+    edChanged();
+  });
+  document.getElementById('ed-col-add').addEventListener('click', function () {
+    var cell = edCell();
+    if (!cell) { setStatus('表のセルをクリックしてから押してください'); return; }
+    var idx = cell.cellIndex, table = cell.closest('table'), focus = null;
+    Array.prototype.forEach.call(table.rows, function (row) {
+      var head = row.parentNode.nodeName === 'THEAD' || row === table.rows[0];
+      var c = newCell(head ? 'th' : 'td');
+      if (head) c.textContent = '見出し';
+      var ref = row.cells[idx];
+      row.insertBefore(c, ref ? ref.nextSibling : null);
+      if (row === cell.parentNode) focus = c;
+    });
+    edCaretTo(focus);
+    edChanged();
+  });
+  document.getElementById('ed-col-del').addEventListener('click', function () {
+    var cell = edCell();
+    if (!cell) { setStatus('表のセルをクリックしてから押してください'); return; }
+    var idx = cell.cellIndex, table = cell.closest('table');
+    if (cell.parentNode.cells.length <= 1) { setStatus('最後の列は消せません（表ごと消すときは「表を削除」）'); return; }
+    Array.prototype.forEach.call(table.rows, function (row) { if (row.cells[idx]) row.removeChild(row.cells[idx]); });
+    var row0 = cell.parentNode && cell.parentNode.cells ? cell.parentNode : table.rows[0];
+    edCaretTo(row0.cells[Math.max(0, idx - 1)]);
+    edChanged();
+  });
+  document.getElementById('ed-table-del').addEventListener('click', function () {
+    var cell = edCell();
+    if (!cell) { setStatus('表のセルをクリックしてから押してください'); return; }
+    if (!confirm('この表を削除しますか？')) return;
+    var table = cell.closest('table');
+    var p = document.createElement('p');
+    p.innerHTML = '<br>';
+    table.parentNode.replaceChild(p, table);
+    edCaretTo(p);
+    edChanged();
+  });
+
+  /* --- 数式・図・目次の編集（クリックで開く） --- */
+  var atomDlg = document.getElementById('atom-dlg');
+  var atomSrcEl = document.getElementById('atom-src');
+  var atomViewEl = document.getElementById('atom-view');
+  var atomTarget = null;    // 編集中の部品（新しく入れるときは null）
+  var atomInline = false;
+  var atomSaved = null;     // 開いたときの選択位置
+
+  function atomKind(src) {
+    src = String(src || '').trim();
+    if (/^```mermaid/i.test(src)) return 'mermaid';
+    if (/^\[TOC\]$/i.test(src)) return 'toc';
+    if (/^\$/.test(src)) return 'math';
+    return 'other';
+  }
+  var ATOM_TEXT = {
+    math: ['数式の編集', '数式は LaTeX（KaTeX）の書き方です。独立した数式は $$ と $$ の間に、文中の数式は $ と $ の間に書きます。'],
+    mermaid: ['図（Mermaid）の編集', '1行目の ```mermaid と最後の ``` の間に Mermaid の書き方で書きます（flowchart・sequenceDiagram・gantt など）。'],
+    toc: ['目次', '目次は見出しから自動で作ります。消すときは「この部品を削除」を押します。'],
+    other: ['部品の編集', 'Markdown の書き方で書きます。']
+  };
+  var atomPreview = debounce(function () {
+    var html = mdToHtml(atomSrcEl.value);
+    atomViewEl.innerHTML = html;
+    renderMath(atomViewEl);
+    if (atomKind(atomSrcEl.value) === 'toc') atomViewEl.innerHTML = '<p class="muted">（見出しから自動で作ります）</p>';
+    renderMermaid(atomViewEl);
+  }, 300);
+
+  function openAtomDlg(target, src, inline) {
+    atomTarget = target;
+    atomInline = target ? target.nodeName === 'SPAN' : !!inline;
+    atomSaved = edRange ? edRange.cloneRange() : null;
+    var text = target ? dec(target.getAttribute('data-md')) : src;
+    var k = ATOM_TEXT[atomKind(text)];
+    document.getElementById('atom-title').textContent = target ? k[0] : k[0].replace('の編集', 'を挿入');
+    document.getElementById('atom-hint').textContent = k[1];
+    document.getElementById('atom-delete').hidden = !target;
+    document.getElementById('atom-apply').textContent = target ? '反映' : '挿入';
+    atomSrcEl.value = text;
+    atomDlg.hidden = false;
+    atomPreview();
+    atomPreview.flush();
+    atomSrcEl.focus();
+  }
+  function closeAtomDlg() {
+    atomDlg.hidden = true;
+    atomTarget = null;
+    atomViewEl.innerHTML = '';
+  }
+  function applyAtom() {
+    var src = atomSrcEl.value.replace(/\s+$/, '');
+    if (!src.trim()) { deleteAtom(); return; }
+    if (atomKind(src) === 'math' && !atomInline && !/^\$\$/.test(src.trim())) src = '$$\n' + src.trim().replace(/^\$+|\$+$/g, '') + '\n$$';
+    var nodes = edPrepare(mdToHtml(src), atomInline);
+    if (atomTarget && atomTarget.parentNode) {
+      var t = atomTarget;
+      nodes.forEach(function (n) { t.parentNode.insertBefore(n, t); });
+      t.parentNode.removeChild(t);
+      edAfterInsert();
+      setStatus('反映しました（保存のときに Markdown に変換します）');
+    } else {
+      edRange = atomSaved;
+      if (atomInline) edInsertInlineNodes(nodes); else edInsertBlockNodes(nodes);
+      setStatus('挿入しました');
+    }
+    closeAtomDlg();
+  }
+  function deleteAtom() {
+    if (atomTarget && atomTarget.parentNode) {
+      atomTarget.parentNode.removeChild(atomTarget);
+      edAfterInsert();
+      setStatus('削除しました');
+    }
+    closeAtomDlg();
+  }
+  atomSrcEl.addEventListener('input', atomPreview);
+  atomSrcEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); applyAtom(); }
+  });
+  document.getElementById('atom-apply').addEventListener('click', applyAtom);
+  document.getElementById('atom-delete').addEventListener('click', function () {
+    if (confirm('この部品を削除しますか？')) deleteAtom();
+  });
+  document.getElementById('atom-close').addEventListener('click', closeAtomDlg);
+  atomDlg.addEventListener('click', function (e) { if (e.target === atomDlg) closeAtomDlg(); });
+
+  pvEl.addEventListener('click', function (e) {
+    if (!e.target.closest || e.target.closest('.toc a')) return;
+    var el = e.target.closest('[data-md]');
+    if (!el || !pvEl.contains(el)) return;
+    e.preventDefault();
+    openAtomDlg(el);
+  });
 
   /* ---------- shortcuts ---------- */
   window.addEventListener('keydown', function (e) {
