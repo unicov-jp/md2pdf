@@ -267,7 +267,32 @@
   .tm-list li .id { color: var(--muted); font-size: 11px; }
   .tm-list li.empty { color: var(--muted); }
   .tm-list li button { font-size: 11px; padding: 2px 6px; }
-  #tm-email { width: 16em; } #tm-name { width: 12em; }
+  #tm-email { flex: 1; min-width: 12em; } #tm-name { width: 10em; }
+  /* 設定・接続の設定 */
+  .dlg-panel.st { width: 600px; }
+  .st .dlg-body { gap: 12px; background: var(--bg); }
+  .st-group { display: flex; flex-direction: column; gap: 12px; }
+  .st-group[hidden] { display: none; }
+  .st-sec { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .st-sec h3 { margin: 0; font-size: 13px; font-weight: 700; color: var(--text); }
+  .st-line { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .st-line .spacer { flex: 1; }
+  .st-line input.wide { flex: 1; min-width: 12em; }
+  .st-pill { font-size: 12px; padding: 3px 12px; border-radius: 999px; background: rgba(107, 114, 128, .15); color: var(--muted); }
+  .st-pill.on { background: rgba(22, 163, 74, .15); color: #15803d; }
+  @media (prefers-color-scheme: dark) { .st-pill.on { color: #4ade80; background: rgba(74, 222, 128, .15); } }
+  .st-cur { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st-msg { margin: 0; padding: 10px 14px; border-radius: 8px; font-size: 13px; background: rgba(37, 99, 235, .08); color: var(--text); }
+  .st-msg[hidden] { display: none; }
+  .dlg-body label.st-field { display: grid; grid-template-columns: 7.5em 1fr; gap: 8px; align-items: center; font-size: 13px; color: var(--text); }
+  .dlg-body label.st-field input { width: 100%; }
+  .dlg-body label.st-opt, .dlg-body label.st-check { font-size: 13px; color: var(--text); gap: 6px; }
+  .st-lbl { font-size: 12px; color: var(--muted); min-width: 7em; }
+  .st-more { font-size: 13px; }
+  .st-more summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  .st-more-body { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+  .st-foot { display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
+  .st .tm-table { font-size: 12px; }
   /* クライアントの変更: 追記は赤字、削除は赤の取り消し線（印刷・PDFにもそのまま出る） */
   .markdown-body ins[data-u] { color: #c1121f; text-decoration: none; background: #fff1f1; border-bottom: 1px solid #c1121f; }
   .markdown-body del[data-u] { color: #c1121f; text-decoration: line-through; background: #fff1f1; }
@@ -509,46 +534,60 @@
   </div>
 </main>
 
-<!-- 設定（第5版）: 接続・フォルダ・取り込み・ユーザーと権限 -->
+<!-- 設定: 接続・ルートフォルダ・ドライブ・ユーザー -->
 <div id="tm-dlg" class="dlg no-print" hidden>
-  <div class="dlg-panel narrow" role="dialog" aria-label="設定">
+  <div class="dlg-panel narrow st" role="dialog" aria-label="設定">
     <div class="dlg-bar"><strong>設定</strong><span class="spacer"></span><button type="button" id="tm-close">閉じる</button></div>
     <div class="dlg-body">
-      <div class="row"><span class="lbl">接続</span><span id="tm-conn-state" class="muted">未接続</span>
-        <button type="button" id="tm-connect" class="primary">Google Drive に接続</button>
-        <button type="button" id="tm-conn">接続の設定（クライアントID・APIキー）</button></div>
-      <div class="row"><span class="lbl">ルートフォルダ</span><span class="muted">名簿（md2pdf-team.json）を置く場所。ドライブを登録しないときは、この直下の .md を一覧に出します: <span id="tm-root">（未設定）</span></span></div>
-      <div class="row">
-        <input type="text" id="tm-root-url" class="wide" placeholder="https://drive.google.com/drive/folders/XXXXXXXX（フォルダの URL または ID）" spellcheck="false" autocomplete="off">
-        <button type="button" id="tm-root-set">URLで設定</button>
-        <button type="button" id="tm-import">取り込み（一覧を読み込む）</button>
-      </div>
-      <p id="tm-roster-msg" class="dlg-hint" hidden></p>
+      <section class="st-sec">
+        <h3>Google Drive</h3>
+        <div class="st-line">
+          <span id="tm-conn-state" class="st-pill">未接続</span><span class="spacer"></span>
+          <button type="button" id="tm-connect" class="primary">接続</button>
+          <button type="button" id="tm-conn">接続の設定</button>
+        </div>
+      </section>
 
-      <div id="tm-roster">
-      <div class="row"><span class="lbl">ドライブ</span><span class="muted">記事（.md）を置く Google Drive のフォルダ。直下の .md を一覧に出します。フォルダの URL を貼って追加できます。</span></div>
-      <ul id="tm-drives" class="tm-list"></ul>
-      <div class="row">
-        <input type="text" id="tm-drive-url" class="wide" placeholder="https://drive.google.com/drive/folders/XXXXXXXX（フォルダの URL または ID）" spellcheck="false" autocomplete="off">
-        <button type="button" id="tm-drive-url-add">URLで追加</button>
-        <button type="button" id="tm-drive-add">フォルダを選ぶ</button>
-      </div>
+      <section class="st-sec">
+        <h3>ルートフォルダ</h3>
+        <div class="st-cur" id="tm-root">（未設定）</div>
+        <div class="st-line">
+          <input type="text" id="tm-root-url" class="wide" placeholder="フォルダの URL" spellcheck="false" autocomplete="off">
+          <button type="button" id="tm-root-set">変更</button>
+          <button type="button" id="tm-import">一覧を読み込む</button>
+        </div>
+      </section>
 
-      <div class="row"><span class="lbl">ユーザーと権限</span><span class="muted">マスターを1人以上登録して保存すると、名簿に無い Google アカウントは接続できなくなります。クライアントは担当のドライブだけを見て直せます（ドライブ単位で指定）。</span></div>
-      <table class="tm-table"><thead><tr><th>メールアドレス</th><th>名前</th><th>役割</th><th>ドライブ</th><th></th></tr></thead><tbody id="tm-users"></tbody></table>
-      <div class="row">
-        <input type="text" id="tm-email" placeholder="メールアドレス" spellcheck="false" autocomplete="off">
-        <input type="text" id="tm-name" placeholder="名前（赤字の変更に付く名前）" autocomplete="off">
-        <select id="tm-role">
-          <option value="user">ユーザー</option>
-          <option value="client">クライアント</option>
-          <option value="master">マスター</option>
-        </select>
-        <button type="button" id="tm-add">追加</button>
-      </div>
-      <label><input type="checkbox" id="tm-share" checked> Google Drive の共有も合わせて設定する（ユーザー: ルート閲覧＋全ドライブ編集、クライアント: ルート閲覧＋担当ドライブ編集。外した分は共有を解除。相手に Google から通知メールが届きます）</label>
-      <p class="dlg-hint">役割: マスター＝すべての操作（この画面、クライアントの変更の採用／却下を含む）。ユーザー＝記事の編集・Update・Rollback・書き出し（全ドライブ）。クライアント＝担当ドライブの記事に、文字の追記（赤字）と削除（赤の取り消し線）を提案して保存するだけ。役割の変更は「保存」で確定し、相手が次に接続したときから効きます。md2pdf-config.json の masters に書いたアカウントは、名簿に関係なく常にマスターです。</p>
-      <div class="row right"><span id="tm-state" class="muted"></span><button type="button" id="tm-save" class="primary">保存</button></div>
+      <p id="tm-roster-msg" class="st-msg" hidden></p>
+
+      <div id="tm-roster" class="st-group">
+        <section class="st-sec">
+          <h3>ドライブ</h3>
+          <ul id="tm-drives" class="tm-list"></ul>
+          <div class="st-line">
+            <input type="text" id="tm-drive-url" class="wide" placeholder="フォルダの URL" spellcheck="false" autocomplete="off">
+            <button type="button" id="tm-drive-url-add">追加</button>
+            <button type="button" id="tm-drive-add">Drive から選ぶ</button>
+          </div>
+        </section>
+
+        <section class="st-sec">
+          <h3>ユーザー</h3>
+          <table class="tm-table"><thead><tr><th>メールアドレス</th><th>名前</th><th>役割</th><th>ドライブ</th><th></th></tr></thead><tbody id="tm-users"></tbody></table>
+          <div class="st-line">
+            <input type="text" id="tm-email" placeholder="メールアドレス" spellcheck="false" autocomplete="off">
+            <input type="text" id="tm-name" placeholder="名前" autocomplete="off">
+            <select id="tm-role">
+              <option value="user">ユーザー</option>
+              <option value="client">クライアント</option>
+              <option value="master">マスター</option>
+            </select>
+            <button type="button" id="tm-add">追加</button>
+          </div>
+          <label class="st-check"><input type="checkbox" id="tm-share" checked> Google Drive の共有も設定する</label>
+        </section>
+
+        <div class="st-foot"><span id="tm-state" class="muted"></span><button type="button" id="tm-save" class="primary">保存</button></div>
       </div>
     </div>
   </div>
@@ -594,23 +633,42 @@
   </div>
 </div>
 
-<!-- Google Drive 設定 -->
+<!-- 接続の設定（Google Drive） -->
 <div id="gd-dlg" class="dlg no-print" hidden>
-  <div class="dlg-panel narrow" role="dialog" aria-label="Google Drive 設定">
-    <div class="dlg-bar"><strong>接続の設定（Google Drive）</strong><span class="spacer"></span><button type="button" id="gd-close">閉じる</button></div>
+  <div class="dlg-panel narrow st" role="dialog" aria-label="接続の設定">
+    <div class="dlg-bar"><strong>接続の設定</strong><span class="spacer"></span><button type="button" id="gd-close">閉じる</button></div>
     <div class="dlg-body">
-      <div class="row"><span class="lbl">クライアントID</span><input type="text" id="gd-client" class="wide" spellcheck="false" placeholder="xxxxxxxx.apps.googleusercontent.com"></div>
-      <div class="row"><span class="lbl">APIキー</span><input type="text" id="gd-key" class="wide" spellcheck="false" placeholder="AIza..."></div>
-      <div class="row"><span class="lbl">アプリID</span><input type="text" id="gd-app" class="wide" spellcheck="false" placeholder="Google Cloud のプロジェクト番号（任意）"></div>
-      <div class="row"><span class="lbl">保存先フォルダ</span><span class="drive-folder-name">（未選択）</span><button type="button" class="drive-folder-pick">フォルダを選ぶ</button><button type="button" id="gd-folder-clear">クリア</button></div>
-      <div class="row"><span class="lbl">権限</span>
-        <label><input type="radio" name="gd-scope" value="file"> drive.file（開いた・作ったファイルと選んだフォルダだけ。既存ファイルは「ファイルを追加」で一覧へ）</label>
-        <label><input type="radio" name="gd-scope" value="full"> drive（フォルダの中の全ファイルを一覧に出せる。チームで同じフォルダを使うならこちら。Workspace の内部アプリなら警告なし）</label>
-      </div>
-      <div class="row"><span class="lbl">チーム設定</span><span id="gd-config-state" class="muted">md2pdf-config.json は未読み込み</span><button type="button" id="gd-reset">この端末の設定をクリア</button></div>
-      <div class="row"><span class="lbl">接続</span><span id="gd-state" class="muted">未接続</span><button type="button" id="gd-connect">接続する</button><button type="button" id="gd-signout">接続を解除</button></div>
-      <p class="dlg-hint">Google Cloud Console で「OAuth クライアントID（ウェブ アプリケーション）」を作り、承認済みの JavaScript 生成元にこのページの URL（例: https://unicov-jp.github.io）を登録します。APIキーは Google Picker API 用です。Google Drive API と Google Picker API を有効にしてください。権限は上の「権限」で選びます（チームで同じフォルダを使うなら drive）。index.html と同じ場所に md2pdf-config.json を置くと、チーム全員が同じ設定で始められます（この画面で保存した値が優先）。設定はこのブラウザにだけ保存され、アクセストークンは保存しません。file:// で開いたページでは Google にログインできません。</p>
-      <div class="row right"><button type="button" id="gd-save" class="primary">設定を保存</button></div>
+      <section class="st-sec">
+        <h3>認証情報（Google Cloud）</h3>
+        <label class="st-field"><span>クライアントID</span><input type="text" id="gd-client" spellcheck="false" placeholder="xxxxxxxx.apps.googleusercontent.com"></label>
+        <label class="st-field"><span>APIキー</span><input type="text" id="gd-key" spellcheck="false" placeholder="AIza..."></label>
+      </section>
+
+      <section class="st-sec">
+        <h3>アクセス範囲</h3>
+        <label class="st-opt"><input type="radio" name="gd-scope" value="full"> フォルダ内のすべてのファイル</label>
+        <label class="st-opt"><input type="radio" name="gd-scope" value="file"> このツールで開いた・作ったファイルだけ</label>
+      </section>
+
+      <section class="st-sec">
+        <h3>接続</h3>
+        <div class="st-line">
+          <span id="gd-state" class="st-pill">未接続</span><span class="spacer"></span>
+          <button type="button" id="gd-connect">接続</button>
+          <button type="button" id="gd-signout">切断</button>
+        </div>
+      </section>
+
+      <details class="st-more">
+        <summary>詳細</summary>
+        <div class="st-more-body">
+          <label class="st-field"><span>アプリID</span><input type="text" id="gd-app" spellcheck="false" placeholder="任意"></label>
+          <div class="st-line"><span class="st-lbl">保存先フォルダ</span><span class="drive-folder-name">（未選択）</span><span class="spacer"></span><button type="button" class="drive-folder-pick">選ぶ</button><button type="button" id="gd-folder-clear">クリア</button></div>
+          <div class="st-line"><span class="st-lbl">共通設定</span><span id="gd-config-state" class="muted">なし</span><span class="spacer"></span><button type="button" id="gd-reset">この端末の設定をクリア</button></div>
+        </div>
+      </details>
+
+      <div class="st-foot"><button type="button" id="gd-save" class="primary">保存</button></div>
     </div>
   </div>
 </div>
@@ -1545,9 +1603,13 @@ function greet(name) {
     return loadScript(GSI_URL);
   }
   // アクセストークンを得る（有効なら使い回す）
-  function getToken(prompt) {
-    if (driveToken && Date.now() < driveTokenExp - 60000) return Promise.resolve(driveToken);
-    return requireDrive().then(ensureGsi).then(function () {
+  var tokenPending = null;
+  var AUTOCONN_KEY = 'md2pdf-drive-autoconnect';   // 前に接続したアカウント（自動でつなぎ直す）
+  function autoConnMail() { try { return localStorage.getItem(AUTOCONN_KEY) || ''; } catch (e) { return ''; } }
+  function getToken(prompt, force) {
+    if (!force && driveToken && Date.now() < driveTokenExp - 60000) return Promise.resolve(driveToken);
+    if (tokenPending) return tokenPending;
+    tokenPending = requireDrive().then(ensureGsi).then(function () {
       return new Promise(function (resolve, reject) {
         if (!tokenClient) {
           tokenClient = window.google.accounts.oauth2.initTokenClient({
@@ -1571,16 +1633,32 @@ function greet(name) {
         tokenErr = function (err) {
           reject(new Error('Google へのログインが中断されました' + (err && err.type ? '（' + err.type + '）' : '')));
         };
-        tokenClient.requestAccessToken({ prompt: prompt || '' });
+        var req = { prompt: prompt || '' };
+        if (!prompt && autoConnMail() && autoConnMail() !== '1') req.hint = autoConnMail();   // 同じアカウントなら選ぶ画面を出さない
+        tokenClient.requestAccessToken(req);
       });
-    });
+    }).then(function (t) { tokenPending = null; return t; }, function (e) { tokenPending = null; throw e; });
+    return tokenPending;
   }
+  // つなぎ直しを不要に: 接続したことがあれば、ボタンなどを押したときに、切れていたり残りが少なければ裏で取り直す
+  // （Google の決まりでトークンは約1時間。取り直しはクリックの中でないとポップアップが止められるため、クリックのついでに行う）
+  var keepAliveAt = 0;
+  document.addEventListener('click', function (e) {
+    if (!autoConnMail() || !driveReady() || tokenPending) return;
+    if (driveToken && driveTokenExp - Date.now() > 10 * 60000) return;
+    var t = e.target;
+    if (!t || !t.closest || !t.closest('button, select, a, #lib-list li, #lib-ver-list li')) return;   // 本文の入力中は邪魔しない
+    if (Date.now() - keepAliveAt < 30000) return;
+    keepAliveAt = Date.now();
+    getToken('', true).catch(function () { /* 失敗したら、次の操作で通常どおりログイン */ });
+  }, true);
   function driveSignOut() {
     if (driveToken && window.google && window.google.accounts && window.google.accounts.oauth2) {
       try { window.google.accounts.oauth2.revoke(driveToken, function () {}); } catch (e) { /* ignore */ }
     }
     driveToken = '';
     driveTokenExp = 0;
+    try { localStorage.removeItem(AUTOCONN_KEY); } catch (e) { /* ignore */ }
     setDriveState();
   }
   function ensurePicker() {
@@ -1728,7 +1806,10 @@ function greet(name) {
   var gdDlg = document.getElementById('gd-dlg');
   function setDriveState() {
     var el = document.getElementById('gd-state');
-    el.textContent = driveToken ? '接続中（' + Math.max(0, Math.round((driveTokenExp - Date.now()) / 60000)) + '分有効）' : (driveReady() ? '未接続（使うときに自動でログイン）' : '設定が未入力');
+    el.textContent = driveToken ? '接続中' : (driveReady() ? '未接続' : '未設定');
+    el.classList.toggle('on', !!driveToken);
+    document.getElementById('gd-connect').hidden = !!driveToken;
+    document.getElementById('gd-signout').hidden = !driveToken;
   }
   function openDriveSettings() {
     document.getElementById('gd-client').value = driveCfg.clientId || '';
@@ -1736,7 +1817,7 @@ function greet(name) {
     document.getElementById('gd-app').value = driveCfg.appId || '';
     var sc = document.querySelector('input[name="gd-scope"][value="' + (driveCfg.scope === 'full' ? 'full' : 'file') + '"]');
     if (sc) sc.checked = true;
-    document.getElementById('gd-config-state').textContent = teamCfgLoaded ? 'md2pdf-config.json を読み込み済み（この端末で保存した設定が優先）' : 'md2pdf-config.json は未読み込み（同じ場所に置くとチーム共通の設定になります）';
+    document.getElementById('gd-config-state').textContent = teamCfgLoaded ? 'md2pdf-config.json あり' : 'なし';
     refreshFolderLabels();
     setDriveState();
     gdDlg.hidden = false;
@@ -2741,7 +2822,11 @@ function greet(name) {
     libRefreshButtons();
     if (!lib.user) {
       // 第5版: 名前を取ったあとに名簿で役割を判定してから一覧を読む（名簿に無ければ接続を解除）
-      driveWhoAmI().then(function (u) { lib.user = u; libRefreshButtons(); return teamAfterLogin(); })
+      driveWhoAmI().then(function (u) {
+        lib.user = u;
+        try { localStorage.setItem(AUTOCONN_KEY, (u && u.emailAddress) || '1'); } catch (e) { /* ignore */ }
+        libRefreshButtons(); return teamAfterLogin();
+      })
         .then(function (ok) { if (ok) teamStart(); if (!tmDlg.hidden) tmRefresh(); });
     } else if (!teamMode || role) {
       teamStart();
@@ -3612,15 +3697,16 @@ function greet(name) {
   function tmRefresh() {
     var connected = libConnectedNow();
     var st = document.getElementById('tm-conn-state');
-    st.textContent = connected ? ('接続中' + (lib.user && lib.user.emailAddress ? '（' + lib.user.emailAddress + '）' : '')) : (driveReady() ? '未接続' : 'クライアントID・APIキーが未入力です');
+    st.textContent = connected ? ('接続中' + (lib.user && lib.user.emailAddress ? '（' + lib.user.emailAddress + '）' : '')) : (driveReady() ? '未接続' : '未設定');
+    st.classList.toggle('on', connected);
     document.getElementById('tm-connect').hidden = connected;
     document.getElementById('tm-root').textContent = driveCfg.folderId ? (driveCfg.folderName || driveCfg.folderId) : '（未設定）';
     var msg = document.getElementById('tm-roster-msg');
     var box = document.getElementById('tm-roster');
-    var why = !driveReady() ? '先に「接続の設定」でクライアントIDとAPIキーを入れてください。'
-      : !connected ? '「Google Drive に接続」を押すと、ドライブとユーザーの設定ができます。'
-      : !driveCfg.folderId ? 'ルートフォルダの URL を入れて「URLで設定」を押すと、ドライブとユーザーの設定ができます。'
-      : (role && role !== 'master') ? 'ドライブとユーザーの設定はマスターだけができます。' : '';
+    var why = !driveReady() ? '「接続の設定」でクライアントIDとAPIキーを入れてください'
+      : !connected ? 'Google Drive に接続すると、ドライブとユーザーを設定できます'
+      : !driveCfg.folderId ? 'ルートフォルダの URL を入れて「変更」を押してください'
+      : (role && role !== 'master') ? 'ドライブとユーザーはマスターだけが設定できます' : '';
     if (why) { tmWork = null; box.hidden = true; msg.hidden = false; msg.textContent = why; return Promise.resolve(); }
     msg.hidden = true; box.hidden = false;
     var ready = team.loaded ? Promise.resolve() : teamLoad().catch(function (e) { tmSt('名簿を読めませんでした: ' + ((e && e.message) || e)); });
@@ -3631,7 +3717,7 @@ function greet(name) {
       var me = lib.user && lowerMail(lib.user.emailAddress);
       if (me && !teamMode && !tmWork.users.some(function (u) { return u.role === 'master'; }) && !tmWork.users.some(function (u) { return u.email === me; })) {
         tmWork.users.unshift({ email: me, name: myName(), role: 'master', drives: [] });
-        tmSt('あなたを最初のマスターに入れました。「保存」で、名簿に無いアカウントを接続できなくします');
+        tmSt('あなたをマスターに追加しました。「保存」で確定します');
       }
       tmRender();
     });
@@ -3683,7 +3769,7 @@ function greet(name) {
     if (!tmWork.users.length) {
       var tr0 = document.createElement('tr');
       var td0 = document.createElement('td');
-      td0.colSpan = 5; td0.className = 'empty'; td0.textContent = 'まだ誰も登録されていません（md2pdf-config.json の masters は常にマスターです）';
+      td0.colSpan = 5; td0.className = 'empty'; td0.textContent = '未登録';
       tr0.appendChild(td0); tb.appendChild(tr0);
     }
     tmWork.users.forEach(function (u, i) {
@@ -3703,7 +3789,7 @@ function greet(name) {
       // ドライブ: クライアントは担当のドライブを選ぶ（ドライブ単位）。ユーザー・マスターは全ドライブ
       var tdD = document.createElement('td'); tdD.className = 'dr';
       if (u.role === 'client') {
-        if (!tmWork.drives.length) { var na = document.createElement('span'); na.className = 'all'; na.textContent = '（ドライブを追加してください）'; tdD.appendChild(na); }
+        if (!tmWork.drives.length) { var na = document.createElement('span'); na.className = 'all'; na.textContent = 'ドライブ未登録'; tdD.appendChild(na); }
         tmWork.drives.forEach(function (d) {
           var lb = document.createElement('label');
           var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = d.id; cb.checked = u.drives.indexOf(d.id) >= 0;
@@ -3728,17 +3814,16 @@ function greet(name) {
     ul.innerHTML = '';
     if (!tmWork.drives.length) {
       var li0 = document.createElement('li'); li0.className = 'empty';
-      li0.textContent = 'ドライブが無いときは、ルートフォルダ（' + (driveCfg.folderName || driveCfg.folderId || '未設定') + '）直下の .md を一覧に出します';
+      li0.textContent = '未登録（ルートフォルダの記事を表示）';
       ul.appendChild(li0);
     }
     tmWork.drives.forEach(function (d, i) {
       var li = document.createElement('li');
       var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = d.name;
-      var id = document.createElement('span'); id.className = 'id'; id.textContent = d.id;
       var del = document.createElement('button'); del.type = 'button'; del.textContent = '外す';
       del.title = '一覧から外します（Drive の共有は変えません）';
       del.addEventListener('click', function () { tmWork.drives.splice(i, 1); tmRender(); });
-      li.appendChild(nm); li.appendChild(id); li.appendChild(del);
+      li.appendChild(nm); li.appendChild(del);
       ul.appendChild(li);
     });
   }
