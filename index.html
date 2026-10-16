@@ -366,6 +366,8 @@
     background: var(--editor-bg); color: var(--text); width: 24em; max-width: 100%;
   }
   .dlg input.wide { width: 100%; flex: 1; }
+  .dlg-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--border); }
+  .dlg-foot .spacer { flex: 1; }
   .dlg-hint { font-size: 12px; color: var(--muted); margin: 0; line-height: 1.6; }
   .dlg-stage { overflow: auto; padding: 14px; background: #e5e7eb; }
   #tpng-sheet { display: inline-block; }
@@ -556,7 +558,7 @@
 <!-- 設定: 接続・ルートフォルダ・ドライブ・ユーザー -->
 <div id="tm-dlg" class="dlg no-print" hidden>
   <div class="dlg-panel narrow st" role="dialog" aria-label="設定">
-    <div class="dlg-bar"><strong>設定</strong><span class="spacer"></span><button type="button" id="tm-close">閉じる</button></div>
+    <div class="dlg-bar"><strong>設定</strong></div>
     <div class="dlg-body">
       <section class="st-sec">
         <h3>Google Drive</h3>
@@ -611,8 +613,8 @@
           <label class="st-check"><input type="checkbox" id="tm-share" checked> Google Drive の共有も設定する</label>
         </section>
 
-        <div class="st-foot"><span id="tm-state" class="muted"></span><button type="button" id="tm-save" class="primary">保存</button></div>
       </div>
+      <div class="st-foot"><span id="tm-state" class="muted"></span><span class="spacer"></span><button type="button" id="tm-close">閉じる</button><button type="button" id="tm-save" class="primary">保存</button></div>
     </div>
   </div>
 </div>
@@ -625,20 +627,22 @@
       <label>ファイル名 <input type="text" id="tpng-name" spellcheck="false"></label>
       <label><input type="radio" name="tpng-dest" value="drive" checked> Google Drive の images フォルダ</label>
       <label><input type="radio" name="tpng-dest" value="local"> このパソコン</label>
-      <span class="spacer"></span>
-      <button type="button" id="tpng-save" class="primary">PNGを保存</button>
-      <button type="button" id="tpng-save-all">すべての表を保存</button>
-      <button type="button" id="tpng-close">閉じる</button>
     </div>
     <p class="dlg-hint" style="padding: 8px 14px 0;">プレビューの表を、記事用の見た目（幅1200px以内）で画像にします。表題は直前の見出し、注記は表の直後の「※」行、ファイル名は表の直後の「画像ファイル：」行から取ります。文字を直すときは、閉じてプレビューの表を書き換えてください。Google Drive に保存するときは「設定」でフォルダを指定します。</p>
     <div class="dlg-stage"><div id="tpng-sheet"></div></div>
+    <div class="dlg-foot">
+      <button type="button" id="tpng-save-all">すべての表を保存</button>
+      <span class="spacer"></span>
+      <button type="button" id="tpng-close">閉じる</button>
+      <button type="button" id="tpng-save" class="primary">PNGを保存</button>
+    </div>
   </div>
 </div>
 
 <!-- 保存（Markdown と PDF） -->
 <div id="save-dlg" class="dlg no-print" hidden>
   <div class="dlg-panel narrow" role="dialog" aria-label="保存">
-    <div class="dlg-bar"><strong>書き出し（Markdown と PDF）</strong><span class="spacer"></span><button type="button" id="save-close">閉じる</button></div>
+    <div class="dlg-bar"><strong>書き出し（Markdown と PDF）</strong></div>
     <div class="dlg-body">
       <div class="row"><span class="lbl">ファイル名</span><input type="text" id="save-name" class="wide" spellcheck="false"><span class="muted">（拡張子は不要）</span></div>
       <div class="row"><span class="lbl">形式</span>
@@ -652,7 +656,7 @@
         <button type="button" class="drive-folder-pick">フォルダを選ぶ</button>
       </div>
       <p class="dlg-hint">チームの正本（一覧のファイル）を保存するのは「Update」です。こちらは手元用・提出用の書き出しで、ファイル名の末尾に _yyyymmdd（今日の日付）が付きます（すでに日付が付いていれば今日の日付に置き換え）。PDF は画像ベース（プレビューをそのまま画像にしたもの）。文字を選択できるPDFが必要なときは「PDF出力（印刷）」を使ってください。Google Drive では同じフォルダに同じ名前があれば上書きします。</p>
-      <div class="row right"><button type="button" id="save-go" class="primary">保存</button></div>
+      <div class="row right"><button type="button" id="save-close">閉じる</button><button type="button" id="save-go" class="primary">保存</button></div>
     </div>
   </div>
 </div>
@@ -660,7 +664,7 @@
 <!-- 接続の設定（Google Drive） -->
 <div id="gd-dlg" class="dlg no-print" hidden>
   <div class="dlg-panel narrow st" role="dialog" aria-label="接続の設定">
-    <div class="dlg-bar"><strong>接続の設定</strong><span class="spacer"></span><button type="button" id="gd-close">閉じる</button></div>
+    <div class="dlg-bar"><strong>接続の設定</strong></div>
     <div class="dlg-body">
       <section class="st-sec">
         <h3>認証情報（Google Cloud）</h3>
@@ -692,7 +696,7 @@
         </div>
       </details>
 
-      <div class="st-foot"><button type="button" id="gd-save" class="primary">保存</button></div>
+      <div class="st-foot"><button type="button" id="gd-close">閉じる</button><button type="button" id="gd-save" class="primary">保存</button></div>
     </div>
   </div>
 </div>
@@ -700,7 +704,7 @@
 <!-- 画像の差し替え -->
 <div id="img-dlg" class="dlg no-print" hidden>
   <div class="dlg-panel narrow" role="dialog" aria-label="画像を差し替え">
-    <div class="dlg-bar"><strong>画像を差し替え</strong><span class="spacer"></span><button type="button" id="img-close">閉じる</button></div>
+    <div class="dlg-bar"><strong>画像を差し替え</strong></div>
     <div class="dlg-body">
       <div class="img-pair">
         <figure><img id="img-cur" alt=""><figcaption id="img-cur-info">今の画像</figcaption></figure>
@@ -712,7 +716,7 @@
         <label><input type="checkbox" id="img-shrink" checked> 幅が1280pxを超える画像は縮小する（写真向け）</label>
       </div>
       <p class="dlg-hint">選んだ画像は Markdown の中に埋め込まれます（data URI）。表の画像は「表をPNG保存」で作った同じ名前のPNGを選んでください。画像の説明（alt）はそのまま残ります。</p>
-      <div class="row right"><button type="button" id="img-apply" class="primary" disabled>差し替える</button></div>
+      <div class="row right"><button type="button" id="img-close">閉じる</button><button type="button" id="img-apply" class="primary" disabled>差し替える</button></div>
     </div>
   </div>
 </div>
@@ -720,7 +724,7 @@
 <!-- 数式・図・目次などの部品の編集（第4版） -->
 <div id="atom-dlg" class="dlg no-print" hidden>
   <div class="dlg-panel narrow" role="dialog" aria-label="部品の編集">
-    <div class="dlg-bar"><strong id="atom-title">部品の編集</strong><span class="spacer"></span><button type="button" id="atom-close">閉じる</button></div>
+    <div class="dlg-bar"><strong id="atom-title">部品の編集</strong></div>
     <div class="dlg-body">
       <textarea id="atom-src" class="atom-src" spellcheck="false" aria-label="部品の中身"></textarea>
       <div class="muted">表示の確認</div>
@@ -729,6 +733,7 @@
       <div class="row right">
         <button type="button" id="atom-delete">この部品を削除</button>
         <span class="spacer"></span>
+        <button type="button" id="atom-close">閉じる</button>
         <button type="button" id="atom-apply" class="primary">反映</button>
       </div>
     </div>
@@ -3743,6 +3748,7 @@ function greet(name) {
       : !connected ? 'Google Drive に接続すると、ドライブとユーザーを設定できます'
       : !driveCfg.folderId ? '名簿の保存先フォルダの URL を入れて「変更」を押してください'
       : (role && role !== 'master') ? 'ドライブとユーザーはマスターだけが設定できます' : '';
+    document.getElementById('tm-save').hidden = !!why;
     if (why) { tmWork = null; box.hidden = true; msg.hidden = false; msg.textContent = why; return Promise.resolve(); }
     msg.hidden = true; box.hidden = false;
     var ready = team.loaded ? Promise.resolve() : teamLoad().catch(function (e) { tmSt('名簿を読めませんでした: ' + ((e && e.message) || e)); });
