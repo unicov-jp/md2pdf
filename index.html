@@ -54,8 +54,16 @@
   header.toolbar #status { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
   header.toolbar .spacer { flex: 0 0 0; }
   #ed-insert { width: 8em; }
+  /* 開く・保存のメニュー */
+  .menu { position: relative; display: inline-flex; }
+  .menu[hidden] { display: none; }
+  .menu-list { position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; min-width: 180px; display: flex; flex-direction: column; padding: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .18); }
+  .menu-list[hidden] { display: none; }
+  .menu-list button { border: 0; background: transparent; text-align: left; padding: 8px 10px; border-radius: 6px; white-space: nowrap; }
+  .menu-list button:hover:not(:disabled) { background: var(--bg); }
+  .menu-list button[hidden] { display: none; }
   /* 使わない機能（書き出し・表をPNG保存・Markdown 欄・PDF出力・用紙と余白の変更。用紙は A4・余白 15mm で固定） */
-  #btn-save, #btn-rollback, #btn-table-png, #btn-md-pane, #btn-print, #tpng-fab, .toolbar label.field, #edit-bar .hint { display: none !important; }
+  #btn-save, #btn-rollback, #btn-table-png, #btn-md-pane, #btn-print, #btn-open, #btn-open-drive, #btn-update, #tpng-fab, .toolbar label.field, #edit-bar .hint { display: none !important; }
   .toolbar label.field { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
   button, select {
     font: inherit; font-size: 13px; padding: 6px 12px;
@@ -225,6 +233,7 @@
   #lib-ver-list li button { font-size: 11px; padding: 2px 8px; }
   #lib-ver-list li.empty { color: var(--muted); }
   #btn-update.dirty::after { content: ' ●'; }
+  #m-save .menu-btn.dirty::before { content: '● '; }
 
   /* ---------- 追加分（第4版）: プレビュー（PDFの見た目）だけで編集。Markdown 欄は既定で隠す ---------- */
   main.md-hidden { grid-template-columns: 1fr; }
@@ -433,6 +442,20 @@
   <h1>Markdown to PDF</h1>
   <button type="button" id="btn-lib" title="左のファイル一覧を出す／隠す">一覧</button>
   <button type="button" id="btn-new">新規</button>
+  <span class="menu" id="m-open">
+    <button type="button" class="menu-btn" aria-haspopup="true">開く ▾</button>
+    <span class="menu-list" hidden>
+      <button type="button" data-act="open-drive">Google Drive から</button>
+      <button type="button" data-act="open-local">このパソコンから</button>
+    </span>
+  </span>
+  <span class="menu" id="m-save">
+    <button type="button" class="menu-btn primary" aria-haspopup="true">保存 ▾</button>
+    <span class="menu-list" hidden>
+      <button type="button" data-act="save-md">Markdown（.md）</button>
+      <button type="button" data-act="save-pdf">PDF（.pdf）</button>
+    </span>
+  </span>
   <button type="button" id="btn-open" title="このパソコンの .md を取り込む（Drive には入れない。入れるときは「一覧に追加」）">開く</button>
   <button type="button" id="btn-open-drive" title="一覧のフォルダ以外にある Google Drive の .md を開く">Driveから開く</button>
   <button type="button" id="btn-update" disabled title="Google Drive のファイルに上書き保存（Ctrl+S。前の内容は履歴に残る）">保存</button>
@@ -1560,8 +1583,40 @@ function greet(name) {
   window.addEventListener('beforeprint', function () {
     flushAll();
     applyPageSettings();
-    document.title = withDateSuffix(getBaseName());
+    document.title = getBaseName() || originalTitle;   // PDF のファイル名（日付は付けない）
   });
+  // 開く・保存のメニュー（項目は今ある機能のボタンを押す。役割で隠れている機能は出さない）
+  function menuClose() { Array.prototype.forEach.call(document.querySelectorAll('.menu-list'), function (l) { l.hidden = true; }); }
+  function menuSync() {
+    var hid = function (id) { var el = document.getElementById(id); return !el || el.hidden; };
+    var od = document.querySelector('#m-open [data-act="open-drive"]'), ol = document.querySelector('#m-open [data-act="open-local"]');
+    od.hidden = hid('btn-open-drive'); ol.hidden = hid('btn-open');
+    document.getElementById('m-open').hidden = od.hidden && ol.hidden;
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.menu'), function (m) {
+    var list = m.querySelector('.menu-list');
+    m.querySelector('.menu-btn').addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = list.hidden;
+      menuClose(); menuSync();
+      list.hidden = !open;
+    });
+    list.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]');
+      if (!b) return;
+      menuClose();
+      var act = b.getAttribute('data-act');
+      if (act === 'open-drive') document.getElementById('btn-open-drive').click();
+      else if (act === 'open-local') document.getElementById('btn-open').click();
+      else if (act === 'save-md') {
+        if (lib.current) libUpdate();   // Google Drive のファイルに上書き
+        else { flushAll(); downloadBlob(new Blob([mdEl.value], { type: 'text/markdown;charset=utf-8' }), (getBaseName() || 'document') + '.md'); setStatus('Markdown をダウンロードしました'); }
+      } else if (act === 'save-pdf') document.getElementById('btn-print').click();
+    });
+  });
+  document.addEventListener('click', menuClose);
+  window.addEventListener('keydown', function (e) { if (e.key === 'Escape') menuClose(); });
+
   window.addEventListener('afterprint', function () {
     document.title = originalTitle;
   });
@@ -2718,6 +2773,7 @@ function greet(name) {
     btnUpdate.disabled = !cur;
     btnUpdate.classList.toggle('primary', cur);
     btnUpdate.classList.toggle('dirty', isDirty());
+    document.querySelector('#m-save .menu-btn').classList.toggle('dirty', isDirty());
     btnRollback.disabled = !(cur && lib.versions.length);
     document.getElementById('lib-add-drive').hidden = !(driveReady() && driveCfg.folderId && driveCfg.scope !== 'full' && libConnectedNow());
     var connected = libConnectedNow();
@@ -3792,6 +3848,7 @@ function greet(name) {
     roleBadge.className = 'role-badge ' + (role || '');
     if (role === 'client' && mdPaneOpen()) setMdPane(false);
     rvRefresh();
+    menuSync();   // 開くメニュー（クライアントは出さない）
   }
   function clientMode() { return role === 'client'; }
   // クライアントは、ローカルのファイルを落として開くこともできない
