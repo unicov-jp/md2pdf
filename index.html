@@ -2576,7 +2576,33 @@ function greet(name) {
   }
 
   // 一覧のフォルダにある画像（images/xxx.png などの相対パス）をプレビューで表示する。Markdown のパスはそのまま
+  // Google Drive の画像リンク（https://drive.google.com/uc?export=view&id=… など）からファイルIDを取り出す
+  function driveImageId(src) {
+    var m = /^https?:\/\/(?:drive|docs)\.google\.com\/(?:uc|open|thumbnail)\?(?:[^#]*&)?id=([\w-]{10,})/i.exec(src) ||
+      /^https?:\/\/drive\.google\.com\/file\/d\/([\w-]{10,})/i.exec(src) ||
+      /^https?:\/\/drive\.usercontent\.google\.com\/(?:download|uc)\?(?:[^#]*&)?id=([\w-]{10,})/i.exec(src) ||
+      /^https?:\/\/lh3\.googleusercontent\.com\/d\/([\w-]{10,})/i.exec(src);
+    return m ? m[1] : '';
+  }
+  // Drive のリンクの画像は、ブラウザが直接は読めない（ログイン情報が送られない）ので、接続中の権限で Drive API から読んで表示する。Markdown のリンクはそのまま
+  function resolveDriveImages(root) {
+    if (!libConnectedNow()) return;
+    Array.prototype.forEach.call(root.querySelectorAll('img'), function (img) {
+      if (img.hasAttribute('data-src')) return;
+      var src = img.getAttribute('src') || '';
+      var id = driveImageId(src);
+      if (!id) return;
+      img.setAttribute('data-src', src);
+      if (imgCache[src]) { img.src = imgCache[src]; return; }
+      driveDownload(id).then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        imgCache[src] = url;
+        if (img.isConnected) img.src = url;
+      }).catch(function () { /* そのまま（表示できない） */ });
+    });
+  }
   function resolveLibImages(root) {
+    resolveDriveImages(root);
     if (!libFolderId() || !libConnectedNow()) return;
     Array.prototype.forEach.call(root.querySelectorAll('img'), function (img) {
       var src = img.getAttribute('src') || '';
@@ -2873,6 +2899,7 @@ function greet(name) {
   // トークンを得たとき（接続ボタン・書き出し・PNG保存など、どこからでも）: 名前を出し、一覧を読み、前回開いていたファイルを選び直す
   function onDriveToken() {
     libRefreshButtons();
+    resolveLibImages(pvEl);   // 接続前に開いていた文書の画像も表示する
     if (!lib.user) {
       // 第5版: 名前を取ったあとに名簿で役割を判定してから一覧を読む（名簿に無ければ接続を解除）
       driveWhoAmI().then(function (u) {
