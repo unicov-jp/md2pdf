@@ -199,7 +199,7 @@
   .lib-head a[hidden] { display: none; }
   .lib-head button { flex: 0 0 auto; }
   .lib-sub:not(:has(> :not([hidden]))) { display: none; }
-  body.lib-is-open #btn-lib { display: none; }
+  body.lib-is-open #btn-lib { border-color: var(--accent); color: var(--accent); }   /* 一覧を開いているとき */
   .lib-head button, .lib-sub button, .lib-foot button { font-size: 12px; padding: 4px 8px; }
   .lib-sub { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 6px 12px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
   .lib-sub .lib-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
@@ -431,7 +431,7 @@
 <body>
 <header class="toolbar no-print">
   <h1>Markdown to PDF</h1>
-  <button type="button" id="btn-lib" title="左に Google Drive のファイル一覧を出す／隠す">一覧</button>
+  <button type="button" id="btn-lib" title="左のファイル一覧を出す／隠す">一覧</button>
   <button type="button" id="btn-new">新規</button>
   <button type="button" id="btn-open" title="このパソコンの .md を取り込む（Drive には入れない。入れるときは「一覧に追加」）">開く</button>
   <button type="button" id="btn-open-drive" title="一覧のフォルダ以外にある Google Drive の .md を開く">Driveから開く</button>
@@ -474,7 +474,6 @@
       <a id="lib-folder-link" href="#" target="_blank" rel="noopener" hidden title="このフォルダを Google Drive で開く">Drive</a>
       <button type="button" id="lib-pick" hidden title="チームのフォルダを選ぶ">フォルダ</button>
       <button type="button" id="lib-reload" title="一覧を読み直す（他の人の更新を取り込む）">再読込</button>
-      <button type="button" id="lib-close" title="一覧を隠す">一覧</button>
     </div>
     <div class="lib-sub">
       <button type="button" id="lib-add-drive" hidden title="Drive のファイルを選んで一覧に加える（drive.file の権限のとき）">ファイルを追加</button>
@@ -2610,7 +2609,6 @@ function greet(name) {
     try { localStorage.setItem(LIB_OPEN_KEY, open ? '1' : '0'); } catch (e) { /* ignore */ }
   }
   document.getElementById('btn-lib').addEventListener('click', function () { libSetOpen(libEl.hidden); });
-  document.getElementById('lib-close').addEventListener('click', function () { libSetOpen(false); });
 
   function libRenderList() {
     var q = (libFilterEl.value || '').trim().toLowerCase();
@@ -4150,9 +4148,11 @@ function greet(name) {
   function fileDate(name) { var m = /_(\d{8}(?:\d{6})?)\.(md|markdown|txt)$/i.exec(String(name || '')); return m ? m[1] : ''; }
   function fmtDate8(d) { return d ? d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8) : ''; }
   function fileNewerThan(a, b) {
-    // 日付（_yyyymmdd / _yyyymmddHHMMSS）は日の単位で比べ、同じ日なら更新が新しい方
-    var da = fileDate(a.name).slice(0, 8), db = fileDate(b.name).slice(0, 8);
-    if (da !== db) return da > db;
+    // ファイル名の日付（_yyyymmdd / _yyyymmddHHMMSS）が新しい方。時刻付き同士は時刻まで比べ、
+    // 日付だけのファイルと同じ日なら Google Drive の更新日時で決める
+    var da = fileDate(a.name), db = fileDate(b.name);
+    if (da.length === 14 && db.length === 14 && da !== db) return da > db;
+    if (da.slice(0, 8) !== db.slice(0, 8)) return da.slice(0, 8) > db.slice(0, 8);
     return String(a.modifiedTime || '') > String(b.modifiedTime || '');
   }
   function libGroups() {
