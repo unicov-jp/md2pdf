@@ -49,6 +49,8 @@
   }
   .toolbar h1 { font-size: 16px; margin: 0 12px 0 0; }
   .toolbar .spacer { flex: 1; }
+  /* 使わない機能（書き出し・表をPNG保存・Markdown 欄・PDF出力・用紙と余白の変更。用紙は A4・余白 15mm で固定） */
+  #btn-save, #btn-table-png, #btn-md-pane, #btn-print, #tpng-fab, .toolbar label.field, #edit-bar .hint { display: none !important; }
   .toolbar label.field { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
   button, select {
     font: inherit; font-size: 13px; padding: 6px 12px;
@@ -3033,7 +3035,8 @@ function greet(name) {
   (function () {
     var v = '0';
     try { v = localStorage.getItem(MD_PANE_KEY) || '0'; } catch (e) { /* ignore */ }
-    if (v === '1') setMdPane(true);
+    // Markdown 欄は出さない（ボタンも出さない）
+    if (v === '1') setMdPane(false);
   })();
 
   // 保存用の HTML: ブラウザが編集中に入れる目印（空のセル・段落の末尾の <br>、書式なしの span）を除く
@@ -4477,7 +4480,7 @@ function greet(name) {
       e.preventDefault();
       if (!saveDlg.hidden) doSave();
       else if (lib.current) libUpdate();
-      else openSaveDlg();
+      else setStatus('一覧でファイルを選ぶか、「一覧に追加（新規ファイル）」で作ってください');
       return;
     }
   });
@@ -4486,8 +4489,7 @@ function greet(name) {
   var saved = storageGet();
   if (saved && typeof saved.md === 'string') {
     fileBase = saved.fileBase || '';
-    if (saved.pageSize && PAGE_SIZES[saved.pageSize]) pageSizeEl.value = saved.pageSize;
-    if (saved.margin) pageMarginEl.value = saved.margin;
+    // 用紙は A4・余白 15mm で固定（前の値は使わない）
     applyPageSettings();
     setContent(saved.md);
   } else {
