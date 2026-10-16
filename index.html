@@ -49,8 +49,13 @@
   }
   .toolbar h1 { font-size: 16px; margin: 0 12px 0 0; }
   .toolbar .spacer { flex: 1; }
+  header.toolbar { flex-wrap: nowrap; }
+  header.toolbar > * { flex: 0 0 auto; }
+  header.toolbar #status { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+  header.toolbar .spacer { flex: 0 0 0; }
+  #ed-insert { width: 8em; }
   /* 使わない機能（書き出し・表をPNG保存・Markdown 欄・PDF出力・用紙と余白の変更。用紙は A4・余白 15mm で固定） */
-  #btn-save, #btn-table-png, #btn-md-pane, #btn-print, #tpng-fab, .toolbar label.field, #edit-bar .hint { display: none !important; }
+  #btn-save, #btn-rollback, #btn-table-png, #btn-md-pane, #btn-print, #tpng-fab, .toolbar label.field, #edit-bar .hint { display: none !important; }
   .toolbar label.field { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
   button, select {
     font: inherit; font-size: 13px; padding: 6px 12px;
@@ -185,8 +190,16 @@
   /* ---------- 追加分: 左のファイル一覧（ポータル。Google Drive が正本） ---------- */
   .lib { background: var(--panel); }
   .lib[hidden] { display: none; }
-  .lib-head { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-  .lib-head .lib-title { font-weight: 700; color: var(--text); flex: 1; }
+  .lib-head { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; height: 40px; padding-top: 0; padding-bottom: 0; padding-left: 10px; padding-right: 10px; }
+  .lib-head .lib-title { display: none; }
+  .lib-head #lib-drive { flex: 1; min-width: 0; }
+  .lib-head .lib-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 12px; }
+  .lib-head #lib-drive:not([hidden]) ~ .lib-name { display: none; }
+  .lib-head a { color: var(--accent); text-decoration: none; font-size: 12px; flex: 0 0 auto; }
+  .lib-head a[hidden] { display: none; }
+  .lib-head button { flex: 0 0 auto; }
+  .lib-sub:not(:has(> :not([hidden]))) { display: none; }
+  body.lib-is-open #btn-lib { display: none; }
   .lib-head button, .lib-sub button, .lib-foot button { font-size: 12px; padding: 4px 8px; }
   .lib-sub { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 6px 12px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
   .lib-sub .lib-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
@@ -218,7 +231,8 @@
   main.md-hidden.lib-open { grid-template-columns: 300px 1fr; }
   main.md-hidden #md-pane { display: none; }
   #btn-md-pane.on { border-color: var(--accent); color: var(--accent); }
-  .edit-bar { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; padding: 6px 12px; }
+  .edit-bar { display: flex; flex-wrap: nowrap; gap: 4px 6px; align-items: center; padding: 0 12px; height: 40px; flex: 0 0 40px; overflow-x: auto; overflow-y: hidden; white-space: nowrap; }
+  .edit-bar .grp { flex: 0 0 auto; }
   .edit-bar .grp { display: inline-flex; gap: 2px; align-items: center; padding-right: 6px; margin-right: 2px; border-right: 1px solid var(--border); }
   .edit-bar .grp:last-of-type { border-right: 0; }
   .edit-bar .grp[hidden] { display: none; }
@@ -421,7 +435,7 @@
   <button type="button" id="btn-new">新規</button>
   <button type="button" id="btn-open" title="このパソコンの .md を取り込む（Drive には入れない。入れるときは「一覧に追加」）">開く</button>
   <button type="button" id="btn-open-drive" title="一覧のフォルダ以外にある Google Drive の .md を開く">Driveから開く</button>
-  <button type="button" id="btn-update" disabled title="一覧で選んだファイルを Google Drive に上書き保存（前の内容は版として残る）">Update</button>
+  <button type="button" id="btn-update" disabled title="Google Drive のファイルに上書き保存（Ctrl+S。前の内容は履歴に残る）">保存</button>
   <button type="button" id="btn-rollback" disabled title="1つ前の版に戻す">Rollback</button>
   <button type="button" id="btn-save" title="Markdown と PDF をファイルに書き出す（ファイル名の末尾に _yyyymmdd）。このパソコンにダウンロード、または Drive に日付付きのコピー">書き出し</button>
   <button type="button" id="btn-table-png" title="プレビューの表を画像（PNG）にします">表をPNG保存</button>
@@ -454,14 +468,15 @@
 <main class="md-hidden">
   <aside id="lib" class="pane lib no-print" hidden>
     <div class="pane-head lib-head">
-      <span class="lib-title">Google Drive</span>
+      <span class="lib-title" hidden>Google Drive</span>
+      <select id="lib-drive" hidden title="記事のフォルダを切り替える"></select>
+      <span id="lib-name" class="lib-name">（フォルダ未設定）</span>
+      <a id="lib-folder-link" href="#" target="_blank" rel="noopener" hidden title="このフォルダを Google Drive で開く">Drive</a>
       <button type="button" id="lib-pick" hidden title="チームのフォルダを選ぶ">フォルダ</button>
       <button type="button" id="lib-reload" title="一覧を読み直す（他の人の更新を取り込む）">再読込</button>
+      <button type="button" id="lib-close" title="一覧を隠す">一覧</button>
     </div>
     <div class="lib-sub">
-      <select id="lib-drive" hidden title="ドライブ（記事のフォルダ）を切り替える"></select>
-      <span id="lib-name" class="lib-name">（フォルダ未設定。「設定」で指定）</span>
-      <a id="lib-folder-link" href="#" target="_blank" rel="noopener" hidden>Driveで開く</a>
       <button type="button" id="lib-add-drive" hidden title="Drive のファイルを選んで一覧に加える（drive.file の権限のとき）">ファイルを追加</button>
     </div>
     <div id="lib-connect" class="lib-connect" hidden>
@@ -484,6 +499,27 @@
   </section>
   <section class="pane">
     <div class="pane-head edit-bar no-print" id="edit-bar" role="toolbar" aria-label="書式">
+      <span class="grp">
+        <button type="button" id="ed-undo" disabled title="編集を1つ戻す（Ctrl+Z）">戻る</button>
+        <button type="button" id="ed-redo" disabled title="戻した編集を進める（Ctrl+Y）">進む</button>
+      </span>
+      <span class="grp">
+        <select id="ed-insert" title="部品を挿入">
+          <option value="">挿入...</option>
+          <option value="math-block">数式（独立）</option>
+          <option value="math-inline">数式（文中）</option>
+          <option value="mermaid">図（Mermaid）</option>
+          <option value="code">コード</option>
+          <option value="NOTE">注意書き（注記）</option>
+          <option value="TIP">注意書き（ヒント）</option>
+          <option value="IMPORTANT">注意書き（重要）</option>
+          <option value="WARNING">注意書き（警告）</option>
+          <option value="CAUTION">注意書き（注意）</option>
+          <option value="toc">目次</option>
+          <option value="hr">区切り線</option>
+          <option value="page-break">改ページ</option>
+        </select>
+      </span>
       <span class="grp">
         <select id="ed-block" title="段落の種類">
           <option value="p">本文</option>
@@ -511,23 +547,6 @@
         <button type="button" id="ed-col-add" title="カーソルのある列の右に列を足す">列+</button>
         <button type="button" id="ed-col-del" title="カーソルのある列を消す">列-</button>
         <button type="button" id="ed-table-del" title="カーソルのある表を消す">表を削除</button>
-      </span>
-      <span class="grp">
-        <select id="ed-insert" title="部品を挿入">
-          <option value="">挿入...</option>
-          <option value="math-block">数式（独立）</option>
-          <option value="math-inline">数式（文中）</option>
-          <option value="mermaid">図（Mermaid）</option>
-          <option value="code">コード</option>
-          <option value="NOTE">注意書き（注記）</option>
-          <option value="TIP">注意書き（ヒント）</option>
-          <option value="IMPORTANT">注意書き（重要）</option>
-          <option value="WARNING">注意書き（警告）</option>
-          <option value="CAUTION">注意書き（注意）</option>
-          <option value="toc">目次</option>
-          <option value="hr">区切り線</option>
-          <option value="page-break">改ページ</option>
-        </select>
       </span>
       <span class="grp" id="rv-grp" hidden>
         <span class="rv-count">クライアントの変更 <b id="rv-count">0</b>件</span>
@@ -1343,6 +1362,7 @@ function greet(name) {
     pvPending = false;
     mdEl.value = md;
     syncFromMarkdown();
+    if (hist) histReset();   // 開いた文書から「戻る」の記録を始める
   }
 
   mdEl.addEventListener('input', function () {
@@ -2585,10 +2605,12 @@ function greet(name) {
   /* --- 画面 --- */
   function libSetOpen(open) {
     libEl.hidden = !open;
+    document.body.classList.toggle('lib-is-open', open);
     document.querySelector('main').classList.toggle('lib-open', open);
     try { localStorage.setItem(LIB_OPEN_KEY, open ? '1' : '0'); } catch (e) { /* ignore */ }
   }
   document.getElementById('btn-lib').addEventListener('click', function () { libSetOpen(libEl.hidden); });
+  document.getElementById('lib-close').addEventListener('click', function () { libSetOpen(false); });
 
   function libRenderList() {
     var q = (libFilterEl.value || '').trim().toLowerCase();
@@ -2644,7 +2666,7 @@ function greet(name) {
       return;
     }
     if (!lib.versions.length) {
-      var e1 = document.createElement('li'); e1.className = 'empty'; e1.textContent = '前の版はまだありません（Update すると残ります）'; libVerListEl.appendChild(e1);
+      var e1 = document.createElement('li'); e1.className = 'empty'; e1.textContent = '前の版はまだありません（保存すると残ります）'; libVerListEl.appendChild(e1);
       return;
     }
     lib.versions.forEach(function (v, i) {
@@ -2757,7 +2779,7 @@ function greet(name) {
     });
   }
   function libOpenFile(file) {
-    if (isDirty() && !confirm('「' + lib.current.name + '」の変更が Update されていません。破棄して「' + file.name + '」を開きますか？')) return;
+    if (isDirty() && !confirm('「' + lib.current.name + '」の変更が保存されていません。破棄して「' + file.name + '」を開きますか？')) return;
     setStatus('読み込み中: ' + file.name);
     return driveFileMeta(file.id).catch(function () { return file; }).then(function (meta) {
       if (file.folder) { meta.folder = file.folder; meta.folderName = file.folderName || ''; }   // サブフォルダの記事
@@ -2789,16 +2811,16 @@ function greet(name) {
     var cur = lib.current;
     var text = mdEl.value;
     btnUpdate.disabled = true;
-    setStatus('Update 中: ' + cur.name);
+    setStatus('保存中: ' + cur.name);
     // 第5版: 今日の日付のファイル（タイトル_yyyymmdd.md）に保存する（同じ日は上書き、日が変われば新しいファイル）
     return libWriteDated(cur, text).then(function (newMeta) {
-      if (!newMeta) { setStatus('Update をやめました（一覧から開き直すと最新の内容を確認できます）'); return; }
+      if (!newMeta) { setStatus('保存をやめました（一覧から開き直すと最新の内容を確認できます）'); return; }
       libAdopt(newMeta, text);
       return libReload(true).then(libLoadVersions).then(function () {
-        setStatus('Update しました: ' + newMeta.name + '（前の内容は履歴に残しました）');
+        setStatus('保存しました: ' + newMeta.name + '（前の内容は履歴に残しました）');
       });
     }).catch(function (e) {
-      setStatus('Update できませんでした: ' + ((e && e.message) || e));
+      setStatus('保存できませんでした: ' + ((e && e.message) || e));
     }).then(function () { libRefreshButtons(); });
   }
   function libRestore(v, index) {
@@ -2829,12 +2851,11 @@ function greet(name) {
   }
   function libNewFile() {
     if (!driveReady() || !libFolderId()) { setStatus('先に Google Drive に接続して、チームのフォルダを選んでください'); return; }
-    var base = stripDateSuffix(getBaseName()) || 'document';
+    var base = getBaseName() || 'document';
     var name = prompt('新しいファイルの名前（チームのフォルダに作ります）', base + '.md');
     if (!name) return;
     name = sanitizeFileName(name);
     if (!isTextName(name)) name += '.md';
-    name = fileTitle(name) + '_' + todayStamp() + '.md';   // 第5版: タイトル_yyyymmdd.md
     if (lib.files.some(function (f) { return f.name === name; }) && !confirm('同じ名前のファイルがあります。上書きしますか？')) return;
     flushAll();
     var text = mdEl.value;
@@ -2901,7 +2922,7 @@ function greet(name) {
       libRenderList();
       libRenderVersions();
       libLoadVersions();
-      setStatus('前回のファイルを選び直しました: ' + found.name + (isDirty() ? '（未保存の変更があります。Update で保存できます）' : ''));
+      setStatus('前回のファイルを選び直しました: ' + found.name + (isDirty() ? '（未保存の変更があります）' : ''));
     }).catch(function () { /* ignore */ });
   }
   function libConnect() {
@@ -3114,6 +3135,91 @@ function greet(name) {
     return true;
   }
   function edChanged() { pvEl.dispatchEvent(new Event('input', { bubbles: true })); }
+
+  // 編集の「戻る」「進む」: プレビューの内容を少し間をおいて記録する（文字入力・表の行列・書式・部品の変更すべて）
+  var hist = { undo: [], redo: [], cur: null, timer: null, restoring: false };
+  var edUndoBtn = document.getElementById('ed-undo');
+  var edRedoBtn = document.getElementById('ed-redo');
+  function histButtons() { edUndoBtn.disabled = !hist.undo.length; edRedoBtn.disabled = !hist.redo.length; }
+  function histReset() {
+    clearTimeout(hist.timer); hist.timer = null;
+    hist.undo = []; hist.redo = []; hist.cur = pvEl.innerHTML;
+    histButtons();
+    // 画像・図は少し遅れて描かれるので、編集が始まる前ならその後の状態を起点にする
+    setTimeout(function () { if (!hist.undo.length && !hist.timer && !hist.redo.length) hist.cur = pvEl.innerHTML; }, 1500);
+  }
+  function histCommit() {
+    clearTimeout(hist.timer); hist.timer = null;
+    var h = pvEl.innerHTML;
+    if (hist.cur === null) { hist.cur = h; return; }
+    if (h === hist.cur) return;
+    hist.undo.push(hist.cur);
+    if (hist.undo.length > 200) hist.undo.shift();
+    hist.cur = h;
+    hist.redo = [];
+    histButtons();
+  }
+  function histRestore(html) {
+    hist.restoring = true;
+    pvEl.innerHTML = html;
+    Array.prototype.forEach.call(pvEl.querySelectorAll('img[data-src]'), function (img) {
+      var u = imgCache[img.getAttribute('data-src')];
+      if (u && img.getAttribute('src') !== u) img.src = u;
+    });
+    pvEl.focus();
+    try { var r = document.createRange(); r.selectNodeContents(pvEl); r.collapse(false); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(r); } catch (e) { /* ignore */ }
+    edChanged();
+    hist.restoring = false;
+    histButtons();
+  }
+  function edUndo() {
+    if (hist.timer) histCommit();
+    if (!hist.undo.length) return;
+    hist.redo.push(hist.cur);
+    hist.cur = hist.undo.pop();
+    histRestore(hist.cur);
+    setStatus('1つ戻しました');
+  }
+  function edRedo() {
+    if (hist.timer) histCommit();
+    if (!hist.redo.length) return;
+    hist.undo.push(hist.cur);
+    hist.cur = hist.redo.pop();
+    histRestore(hist.cur);
+    setStatus('1つ進めました');
+  }
+  pvEl.addEventListener('input', function () {
+    if (hist.restoring) return;
+    clearTimeout(hist.timer);
+    hist.timer = setTimeout(histCommit, 600);
+    edUndoBtn.disabled = false;
+  });
+  pvEl.addEventListener('keydown', function (e) {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    var k = (e.key || '').toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); edUndo(); }
+    else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); edRedo(); }
+  });
+  pvEl.addEventListener('beforeinput', function (e) {
+    if (e.inputType === 'historyUndo') { e.preventDefault(); edUndo(); }
+    else if (e.inputType === 'historyRedo') { e.preventDefault(); edRedo(); }
+  });
+  edUndoBtn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+  edRedoBtn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+  edUndoBtn.addEventListener('click', edUndo);
+  edRedoBtn.addEventListener('click', edRedo);
+  // 書式バーの操作（表の行・列、書式、挿入など）は、それぞれ1つの「戻る」単位にする
+  function histFlushSoon() { setTimeout(function () { if (hist.timer) histCommit(); }, 0); }
+  var edBarEl = document.getElementById('edit-bar');
+  edBarEl.addEventListener('mousedown', function (e) {
+    var b = e.target.closest && e.target.closest('button, select');
+    if (b && b !== edUndoBtn && b !== edRedoBtn && hist.timer) histCommit();
+  }, true);
+  edBarEl.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('button');
+    if (b && b !== edUndoBtn && b !== edRedoBtn) histFlushSoon();
+  });
+  edBarEl.addEventListener('change', histFlushSoon);
   function edCaretTo(el, selectAll) {
     if (!el) return;
     var r = document.createRange();
@@ -4076,10 +4182,11 @@ function greet(name) {
   }
   // 今日の日付のファイルに書く。開いているのが今日のファイルならそのまま上書き（他の人の更新は確認）、違えば今日のファイルを作る（あれば確認して上書き）
   function libWriteDated(cur, text) {
+    // 1ファイルで完結: 開いているファイルにそのまま上書きする（日付は付けない。前の内容は Google Drive の版として残る）
+    return checkConflict(cur).then(function (meta) { return meta ? driveWriteText(cur, text) : null; });
+  }
+  function libWriteDatedOld(cur, text) {
     var name = fileTitle(cur.name) + '_' + todayStamp() + '.md';
-    if (cur.name === name) {
-      return checkConflict(cur).then(function (meta) { return meta ? driveWriteText(cur, text) : null; });
-    }
     return checkConflict(cur).then(function (ok) {
       // 開いていたファイルが他の人に更新されていれば、新しい日付のファイルを作る前にも知らせる
       if (!ok) return null;
