@@ -549,7 +549,7 @@
       </section>
 
       <section class="st-sec">
-        <h3>ルートフォルダ</h3>
+        <h3>名簿の保存先</h3>
         <div class="st-cur" id="tm-root">（未設定）</div>
         <div class="st-line">
           <input type="text" id="tm-root-url" class="wide" placeholder="フォルダの URL" spellcheck="false" autocomplete="off">
@@ -562,7 +562,7 @@
 
       <div id="tm-roster" class="st-group">
         <section class="st-sec">
-          <h3>ドライブ</h3>
+          <h3>記事のフォルダ</h3>
           <ul id="tm-drives" class="tm-list"></ul>
           <div class="st-line">
             <input type="text" id="tm-drive-url" class="wide" placeholder="フォルダの URL" spellcheck="false" autocomplete="off">
@@ -573,7 +573,7 @@
 
         <section class="st-sec">
           <h3>ユーザー</h3>
-          <table class="tm-table"><thead><tr><th>メールアドレス</th><th>名前</th><th>役割</th><th>ドライブ</th><th></th></tr></thead><tbody id="tm-users"></tbody></table>
+          <table class="tm-table"><thead><tr><th>メールアドレス</th><th>名前</th><th>役割</th><th>担当フォルダ</th><th></th></tr></thead><tbody id="tm-users"></tbody></table>
           <div class="st-line">
             <input type="text" id="tm-email" placeholder="メールアドレス" spellcheck="false" autocomplete="off">
             <input type="text" id="tm-name" placeholder="名前" autocomplete="off">
@@ -3705,7 +3705,7 @@ function greet(name) {
     var box = document.getElementById('tm-roster');
     var why = !driveReady() ? '「接続の設定」でクライアントIDとAPIキーを入れてください'
       : !connected ? 'Google Drive に接続すると、ドライブとユーザーを設定できます'
-      : !driveCfg.folderId ? 'ルートフォルダの URL を入れて「変更」を押してください'
+      : !driveCfg.folderId ? '名簿の保存先フォルダの URL を入れて「変更」を押してください'
       : (role && role !== 'master') ? 'ドライブとユーザーはマスターだけが設定できます' : '';
     if (why) { tmWork = null; box.hidden = true; msg.hidden = false; msg.textContent = why; return Promise.resolve(); }
     msg.hidden = true; box.hidden = false;
@@ -3720,6 +3720,12 @@ function greet(name) {
         tmSt('あなたをマスターに追加しました。「保存」で確定します');
       }
       tmRender();
+      tmWork.drives.forEach(function (d) {
+        if (d.name.indexOf(' > ') >= 0) return;
+        driveFolderLabel(d.id).then(function (x) {
+          if (tmWork && x.name !== d.name) { d.name = x.name; tmRender(); }
+        }).catch(function () { /* ignore */ });
+      });
     });
   }
   document.getElementById('tm-connect').addEventListener('click', function () {
@@ -3742,7 +3748,7 @@ function greet(name) {
       team.loaded = false; team.users = []; team.drives = []; team.fileId = '';
       lib.current = null; lib.loadedText = null; persistCurrent();
       lib.loaded = false;
-      tmSt('ルートフォルダを設定しました: ' + j.name);
+      tmSt('名簿の保存先を設定しました: ' + j.name);
       return libReload().then(function () { return tmRefresh(); });
     }).catch(function (e) { tmSt('このフォルダは設定できません（' + ((e && e.message) || e) + '）。URL と、あなたに閲覧権限があるかを確認してください'); });
   });
@@ -3751,7 +3757,7 @@ function greet(name) {
   document.getElementById('tm-import').addEventListener('click', function () {
     if (!driveReady()) { openDriveSettings(); return; }
     if (!libConnectedNow()) { tmSt('先に「Google Drive に接続」してください'); return; }
-    if (!libFolderId()) { tmSt('先にルートフォルダの URL を設定してください'); return; }
+    if (!libFolderId()) { tmSt('先に名簿の保存先フォルダの URL を設定してください'); return; }
     tmSt('取り込み中...');
     team.loaded = false;
     teamLoad().catch(function () { /* 名簿が無くても一覧は読む */ }).then(function () {
@@ -3789,7 +3795,7 @@ function greet(name) {
       // ドライブ: クライアントは担当のドライブを選ぶ（ドライブ単位）。ユーザー・マスターは全ドライブ
       var tdD = document.createElement('td'); tdD.className = 'dr';
       if (u.role === 'client') {
-        if (!tmWork.drives.length) { var na = document.createElement('span'); na.className = 'all'; na.textContent = 'ドライブ未登録'; tdD.appendChild(na); }
+        if (!tmWork.drives.length) { var na = document.createElement('span'); na.className = 'all'; na.textContent = 'フォルダ未登録'; tdD.appendChild(na); }
         tmWork.drives.forEach(function (d) {
           var lb = document.createElement('label');
           var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = d.id; cb.checked = u.drives.indexOf(d.id) >= 0;
@@ -3814,7 +3820,7 @@ function greet(name) {
     ul.innerHTML = '';
     if (!tmWork.drives.length) {
       var li0 = document.createElement('li'); li0.className = 'empty';
-      li0.textContent = '未登録（ルートフォルダの記事を表示）';
+      li0.textContent = '未登録（名簿の保存先にある記事を表示）';
       ul.appendChild(li0);
     }
     tmWork.drives.forEach(function (d, i) {
@@ -3841,15 +3847,28 @@ function greet(name) {
     tmRender();
   });
   document.getElementById('tm-email').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tm-add').click(); } });
+  // 記事のフォルダの表示名: 「親フォルダ名 > フォルダ名」（同じ名前のフォルダをクライアントで見分ける。親の先頭の番号「01.」は省く）
+  function driveFolderLabel(id) {
+    return driveGetMeta(id, 'id,name,mimeType,parents').then(function (j) {
+      if (!j || !j.id) throw new Error('見つかりません');
+      if (j.mimeType !== 'application/vnd.google-apps.folder') throw new Error('フォルダではありません: ' + j.name);
+      var pid = j.parents && j.parents[0];
+      if (!pid) return { id: j.id, name: j.name };
+      return driveGetMeta(pid, 'id,name').then(function (pj) {
+        var pn = String((pj && pj.name) || '').replace(/^\s*\d+\s*[.．_\-]\s*/, '').trim();
+        return { id: j.id, name: pn ? pn + ' > ' + j.name : j.name };
+      }, function () { return { id: j.id, name: j.name }; });
+    });
+  }
   function tmAddDrive(f) {
     if (!f || !tmWork) return;
     if (tmWork.drives.some(function (d) { return d.id === f.id; })) { document.getElementById('tm-state').textContent = 'すでに追加されています: ' + f.name; return; }
     tmWork.drives.push({ id: f.id, name: f.name || f.id });
-    document.getElementById('tm-state').textContent = 'ドライブを追加しました: ' + (f.name || f.id) + '（「保存」で確定）';
+    document.getElementById('tm-state').textContent = '記事のフォルダを追加しました: ' + (f.name || f.id) + '（「保存」で確定）';
     tmRender();
   }
   document.getElementById('tm-drive-add').addEventListener('click', function () {
-    pickDrive('folder').then(tmAddDrive).catch(function (e) { document.getElementById('tm-state').textContent = (e && e.message) || String(e); });
+    pickDrive('folder').then(function (f) { return f ? driveFolderLabel(f.id).catch(function () { return f; }) : f; }).then(tmAddDrive).catch(function (e) { document.getElementById('tm-state').textContent = (e && e.message) || String(e); });
   });
   // URL（または ID）で追加: フォルダかどうか・開けるかを確かめてから加える
   document.getElementById('tm-drive-url-add').addEventListener('click', function () {
@@ -3859,11 +3878,9 @@ function greet(name) {
     if (!tmWork) return;
     if (!id) { st.textContent = 'フォルダの URL（https://drive.google.com/drive/folders/…）または ID を入れてください'; return; }
     st.textContent = 'フォルダを確認中...';
-    driveGetMeta(id, 'id,name,mimeType').then(function (j) {
-      if (!j || !j.id) throw new Error('見つかりません');
-      if (j.mimeType !== 'application/vnd.google-apps.folder') throw new Error('フォルダではありません: ' + j.name);
+    driveFolderLabel(id).then(function (d) {
       inp.value = '';
-      tmAddDrive({ id: j.id, name: j.name });
+      tmAddDrive(d);
     }).catch(function (e) { st.textContent = 'このフォルダは追加できません（' + ((e && e.message) || e) + '）。URL と、あなたに閲覧権限があるかを確認してください'; });
   });
   document.getElementById('tm-drive-url').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tm-drive-url-add').click(); } });
