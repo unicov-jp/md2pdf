@@ -291,6 +291,7 @@
   .st .dlg-body { gap: 12px; background: var(--bg); }
   .st-group { display: flex; flex-direction: column; gap: 12px; }
   .st-group[hidden] { display: none; }
+  .st-sec[hidden], .st-line[hidden] { display: none !important; }
   .st-sec { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
   .st-sec h3 { margin: 0; font-size: 13px; font-weight: 700; color: var(--text); }
   .st-line { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -566,7 +567,7 @@
         </div>
       </section>
 
-      <section class="st-sec">
+      <section class="st-sec" id="tm-root-sec">
         <h3>名簿の保存先</h3>
         <div class="st-cur" id="tm-root">（未設定）</div>
         <div class="st-line">
@@ -686,7 +687,7 @@
         <summary>詳細</summary>
         <div class="st-more-body">
           <label class="st-field"><span>アプリID</span><input type="text" id="gd-app" spellcheck="false" placeholder="任意"></label>
-          <div class="st-line"><span class="st-lbl">保存先フォルダ</span><span class="drive-folder-name">（未選択）</span><span class="spacer"></span><button type="button" class="drive-folder-pick">選ぶ</button><button type="button" id="gd-folder-clear">クリア</button></div>
+          <div class="st-line" id="gd-folder-row"><span class="st-lbl">保存先フォルダ</span><span class="drive-folder-name">（未選択）</span><span class="spacer"></span><button type="button" class="drive-folder-pick">選ぶ</button><button type="button" id="gd-folder-clear">クリア</button></div>
           <div class="st-line"><span class="st-lbl">共通設定</span><span id="gd-config-state" class="muted">なし</span><span class="spacer"></span><button type="button" id="gd-reset">この端末の設定をクリア</button></div>
         </div>
       </details>
@@ -1845,6 +1846,7 @@ function greet(name) {
     document.getElementById('gd-config-state').textContent = teamCfgLoaded ? 'md2pdf-config.json あり' : 'なし';
     refreshFolderLabels();
     setDriveState();
+    document.getElementById('gd-folder-row').hidden = rootFixed;
     gdDlg.hidden = false;
   }
   function closeDriveSettings() { gdDlg.hidden = true; }
@@ -2966,6 +2968,7 @@ function greet(name) {
   }
 
   // チーム共通の設定（index.html と同じ場所の md2pdf-config.json）。この端末で保存した設定があればそちらが優先
+  var rootFixed = false;   // md2pdf-config.json で名簿の保存先が決まっている
   function loadTeamConfig() {
     if (!/^https?:/.test(location.protocol)) return Promise.resolve();
     return fetch(TEAM_CONFIG_URL, { cache: 'no-store' }).then(function (r) {
@@ -2979,6 +2982,13 @@ function greet(name) {
         if (cfg[k] !== undefined && cfg[k] !== null && cfg[k] !== '') merged[k] = String(cfg[k]);
       });
       Object.keys(driveCfg).forEach(function (k) { if (driveCfg[k] !== undefined && driveCfg[k] !== '') merged[k] = driveCfg[k]; });
+      // 名簿の保存先（folderId）は共通設定で固定（端末ごとの値より優先し、画面では変えない）
+      if (cfg.folderId) {
+        rootFixed = true;
+        if (merged.folderId !== String(cfg.folderId)) { merged.folderLink = ''; }
+        merged.folderId = String(cfg.folderId);
+        merged.folderName = cfg.folderName ? String(cfg.folderName) : (merged.folderId === driveCfg.folderId ? merged.folderName : '');
+      }
       driveCfg = merged;
       teamSetMasters(cfg.masters);   // 第5版: 初期マスター（あればチームモード）
       refreshFolderLabels();
@@ -3726,6 +3736,7 @@ function greet(name) {
     st.classList.toggle('on', connected);
     document.getElementById('tm-connect').hidden = connected;
     document.getElementById('tm-root').textContent = driveCfg.folderId ? (driveCfg.folderName || driveCfg.folderId) : '（未設定）';
+    document.getElementById('tm-root-sec').hidden = rootFixed;
     var msg = document.getElementById('tm-roster-msg');
     var box = document.getElementById('tm-roster');
     var why = !driveReady() ? '「接続の設定」でクライアントIDを入れてください'
@@ -3760,6 +3771,7 @@ function greet(name) {
   });
   // ルートフォルダを URL で指定
   document.getElementById('tm-root-set').addEventListener('click', function () {
+    if (rootFixed) return;
     var inp = document.getElementById('tm-root-url');
     var id = driveIdFromUrl(inp.value);
     if (!id) { tmSt('フォルダの URL（https://drive.google.com/drive/folders/…）または ID を入れてください'); return; }
@@ -3880,7 +3892,19 @@ function greet(name) {
       var del = document.createElement('button'); del.type = 'button'; del.textContent = '外す';
       del.title = '一覧から外します（Drive の共有は変えません）';
       del.addEventListener('click', function () { tmWork.drives.splice(i, 1); tmRender(); });
-      li.appendChild(nm); li.appendChild(del);
+      // Drive でフォルダ名を変えたときに、今の名前（クライアント名 > フォルダ名）を読み直す
+      var up = document.createElement('button'); up.type = 'button'; up.className = 'up'; up.textContent = '更新';
+      up.title = 'Google Drive の今のフォルダ名を読み直します';
+      up.addEventListener('click', function () {
+        up.disabled = true;
+        driveFolderLabel(d.id).then(function (x) {
+          var old = d.name;
+          d.name = x.name;
+          tmRender();
+          tmSt(old === x.name ? '名前は変わっていません: ' + x.name : '名前を更新しました: ' + x.name + '（「保存」で確定）');
+        }).catch(function (e) { up.disabled = false; tmSt('読み直せませんでした（' + ((e && e.message) || e) + '）'); });
+      });
+      li.appendChild(nm); li.appendChild(up); li.appendChild(del);
       ul.appendChild(li);
     });
   }
