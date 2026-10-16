@@ -267,7 +267,14 @@
   .tm-list li .id { color: var(--muted); font-size: 11px; }
   .tm-list li.empty { color: var(--muted); }
   .tm-list li button { font-size: 11px; padding: 2px 6px; }
-  #tm-email { flex: 1; min-width: 12em; } #tm-name { width: 10em; }
+  .st .tm-table { table-layout: fixed; }
+  .st .tm-table col.c-em { width: 29%; } .st .tm-table col.c-nm { width: 18%; } .st .tm-table col.c-rl { width: 22%; } .st .tm-table col.c-bt { width: 60px; }
+  .st .tm-table th, .st .tm-table td { padding: 6px; vertical-align: middle; }
+  .st .tm-table td input[type="text"], .st .tm-table td select { width: 100%; box-sizing: border-box; }
+  .st .tm-table td input[type="text"], .st .tm-table td select, .st .tm-table td button { font-size: 12px; padding: 4px 6px; height: 28px; }
+  .st .tm-table td:last-child { text-align: right; }
+  .st .tm-table td:last-child button { width: 100%; }
+  .st .tm-table tfoot td { border-bottom: 0; padding-top: 10px; }
   /* 設定・接続の設定 */
   .dlg-panel.st { width: 600px; }
   .st .dlg-body { gap: 12px; background: var(--bg); }
@@ -573,17 +580,22 @@
 
         <section class="st-sec">
           <h3>ユーザー</h3>
-          <table class="tm-table"><thead><tr><th>メールアドレス</th><th>名前</th><th>役割</th><th>担当フォルダ</th><th></th></tr></thead><tbody id="tm-users"></tbody></table>
-          <div class="st-line">
-            <input type="text" id="tm-email" placeholder="メールアドレス" spellcheck="false" autocomplete="off">
-            <input type="text" id="tm-name" placeholder="名前" autocomplete="off">
-            <select id="tm-role">
-              <option value="user">ユーザー</option>
-              <option value="client">クライアント</option>
-              <option value="master">マスター</option>
-            </select>
-            <button type="button" id="tm-add">追加</button>
-          </div>
+          <table class="tm-table">
+            <colgroup><col class="c-em"><col class="c-nm"><col class="c-rl"><col class="c-dr"><col class="c-bt"></colgroup>
+            <thead><tr><th>メールアドレス</th><th>名前</th><th>役割</th><th>担当フォルダ</th><th></th></tr></thead>
+            <tbody id="tm-users"></tbody>
+            <tfoot><tr class="tm-addrow">
+              <td><input type="text" id="tm-email" placeholder="メールアドレス" spellcheck="false" autocomplete="off"></td>
+              <td><input type="text" id="tm-name" placeholder="名前" autocomplete="off"></td>
+              <td><select id="tm-role">
+                <option value="user">ユーザー</option>
+                <option value="client">クライアント</option>
+                <option value="master">マスター</option>
+              </select></td>
+              <td></td>
+              <td><button type="button" id="tm-add">追加</button></td>
+            </tr></tfoot>
+          </table>
           <label class="st-check"><input type="checkbox" id="tm-share" checked> Google Drive の共有も設定する</label>
         </section>
 
@@ -3782,7 +3794,7 @@ function greet(name) {
       var tr = document.createElement('tr');
       var td1 = document.createElement('td'); td1.className = 'em'; td1.textContent = u.email;
       var td2 = document.createElement('td');
-      var nm = document.createElement('input'); nm.type = 'text'; nm.value = u.name; nm.style.width = '9em';
+      var nm = document.createElement('input'); nm.type = 'text'; nm.value = u.name;
       nm.addEventListener('input', function () { u.name = nm.value; });
       td2.appendChild(nm);
       var td3 = document.createElement('td');
