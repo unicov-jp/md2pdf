@@ -91,6 +91,8 @@
     /* 数式・図・目次はプレビュー上では編集不可の部品（Markdown側で編集） */
     #preview [data-md] { cursor: default; border-radius: 4px; }
     #preview [data-md]:hover { outline: 1px dashed #93c5fd; outline-offset: 2px; }
+    /* 足したばかりの空の見出しセルに、薄く「見出し」と出す（文字としては入らない） */
+    #preview th:empty::before { content: '見出し'; color: #9ca3af; font-weight: normal; }
   }
 
   @media (max-width: 800px) {
@@ -1218,7 +1220,7 @@ function greet(name) {
     var d = new Date();
     return d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate());
   }
-  function stripDateSuffix(name) { return String(name || '').replace(/_\d{8}$/, ''); }
+  function stripDateSuffix(name) { return String(name || '').replace(/_\d{8}(\d{6})?$/, ''); }
   function withDateSuffix(name) { return stripDateSuffix(name) + '_' + todayStamp(); }
 
   /* ---------- sync ---------- */
@@ -1390,7 +1392,7 @@ function greet(name) {
           setStatus((job.mime === 'application/pdf' ? 'PDFを生成中...' : 'Markdownを保存中...'));
           return job.make().then(function (blob) {
             if (dest === 'drive') {
-              return driveUpload(job.name, blob, job.mime, libFolderId()).then(function (r) { saved.push(job.name + (r && r.updated ? '（上書き）' : '')); });
+              return driveUpload(job.name, blob, job.mime, curFolderId()).then(function (r) { saved.push(job.name + (r && r.updated ? '（上書き）' : '')); });
             }
             downloadBlob(blob, job.name);
             saved.push(job.name);
@@ -2024,7 +2026,7 @@ function greet(name) {
     return elementToPng(tpngSheet.firstChild).then(function (blob) {
       if (dest === 'drive') {
         // 一覧のフォルダの images/ に入れる（記事の画像リンク版と同じ置き場所）
-        return driveEnsureSubfolder(libFolderId(), 'images').then(function (imgFolderId) {
+        return driveEnsureSubfolder(curFolderId(), 'images').then(function (imgFolderId) {
           return driveUpload(fname, blob, 'image/png', imgFolderId);
         }).then(function () {
           forgetImage('images/' + fname);
@@ -2334,7 +2336,28 @@ function greet(name) {
       webViewLink: f.webViewLink || '', lastModifiedBy: (f.lastModifyingUser && f.lastModifyingUser.displayName) || ''
     };
   }
+  // 記事ごとのサブフォルダ（1階層）の .md も一覧に出す。images・99.（古い版置き場）などは除く
+  function driveListSubfolders(folderId) {
+    var q = "'" + folderId + "' in parents and trashed = false and mimeType = 'application/vnd.google-apps.folder'";
+    return driveFetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=files(id,name)&orderBy=name&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true')
+      .then(function (r) { return r.json(); })
+      .then(function (j) { return (j.files || []).filter(function (f) { return !/^(images|99\.|_)/i.test(f.name); }).slice(0, 60); })
+      .catch(function () { return []; });
+  }
   function driveListFolder(folderId) {
+    return Promise.all([driveListFolderOnly(folderId), driveListSubfolders(folderId)]).then(function (r) {
+      var all = r[0];
+      return Promise.all(r[1].map(function (sf) {
+        return driveListFolderOnly(sf.id).then(function (files) {
+          files.forEach(function (f) { f.folder = sf.id; f.folderName = sf.name; });
+          return files;
+        }).catch(function () { return []; });
+      })).then(function (lists) { lists.forEach(function (l) { all = all.concat(l); }); return all; });
+    });
+  }
+  // いま開いているファイルのあるフォルダ（サブフォルダの記事ならそのサブフォルダ）
+  function curFolderId() { return (lib.current && lib.current.folder) || libFolderId(); }
+  function driveListFolderOnly(folderId) {
     var q = "'" + folderId + "' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'";
     return driveFetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) +
       '&fields=files(' + FILE_FIELDS + ')&orderBy=name&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true')
@@ -2375,9 +2398,10 @@ function greet(name) {
     return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '/revisions/' + encodeURIComponent(v.id) + '?alt=media')
       .then(function (r) { return r.text(); });
   }
-  function driveCreateText(name, text) {
-    return driveUpload(name, new Blob([text], { type: 'text/markdown;charset=utf-8' }), 'text/markdown', libFolderId())
-      .then(function (j) { return driveFileMeta(j.id).catch(function () { return { id: j.id, name: name }; }); });
+  function driveCreateText(name, text, folderId, folderName) {
+    return driveUpload(name, new Blob([text], { type: 'text/markdown;charset=utf-8' }), 'text/markdown', folderId || libFolderId())
+      .then(function (j) { return driveFileMeta(j.id).catch(function () { return { id: j.id, name: name }; }); })
+      .then(function (m) { if (folderId && folderId !== libFolderId()) { m.folder = folderId; m.folderName = folderName || ''; } return m; });
   }
   function driveFindChild(parentId, name, isFolder) {
     var key = parentId + '/' + name;
@@ -2404,7 +2428,7 @@ function greet(name) {
   }
   function driveReadBinary(path) {
     var parts = path.split('/').filter(function (s) { return s && s !== '.'; });
-    var p = Promise.resolve(libFolderId());
+    var p = Promise.resolve(curFolderId());
     parts.slice(0, -1).forEach(function (seg) {
       p = p.then(function (pid) { return driveFindChild(pid, seg, true); });
     });
@@ -2558,6 +2582,7 @@ function greet(name) {
   });
 
   function libSelect(file, text) {
+    if (((lib.current && lib.current.folder) || '') !== ((file && file.folder) || '')) clearImgCache();   // 画像は記事のフォルダごと
     lib.current = file || null;
     lib.loadedText = file ? (typeof text === 'string' ? text : mdEl.value) : null;
     lib.versions = [];
@@ -2620,8 +2645,12 @@ function greet(name) {
     if (isDirty() && !confirm('「' + lib.current.name + '」の変更が Update されていません。破棄して「' + file.name + '」を開きますか？')) return;
     setStatus('読み込み中: ' + file.name);
     return driveFileMeta(file.id).catch(function () { return file; }).then(function (meta) {
+      if (file.folder) { meta.folder = file.folder; meta.folderName = file.folderName || ''; }   // サブフォルダの記事
       return driveReadText(meta).then(function (text) {
         driveFileId = meta.id;
+        // 画像（images/…）は記事のフォルダから読むので、描く前に開くファイル（フォルダ）を決めておく
+        if (((lib.current && lib.current.folder) || '') !== (meta.folder || '')) clearImgCache();
+        lib.current = meta;
         openText(text, meta.name);
         libSelect(meta, text);
         setStatus('開きました: ' + meta.name + (meta.lastModifiedBy ? '（最終更新: ' + meta.lastModifiedBy + '　' + fmtTime(meta.modifiedTime) + '）' : ''));
@@ -3226,7 +3255,6 @@ function greet(name) {
     Array.prototype.forEach.call(table.rows, function (row) {
       var head = row.parentNode.nodeName === 'THEAD' || row === table.rows[0];
       var c = newCell(head ? 'th' : 'td');
-      if (head) c.textContent = '見出し';
       var ref = row.cells[idx];
       row.insertBefore(c, ref ? ref.nextSibling : null);
       if (row === cell.parentNode) focus = c;
@@ -3826,19 +3854,20 @@ function greet(name) {
   document.getElementById('btn-users').addEventListener('click', openTeamDlg);
 
   /* --- 日付付きファイル（タイトル_yyyymmdd.md）。同じタイトルは最新の日付を参照する --- */
-  function fileTitle(name) { return String(name || '').replace(/\.(md|markdown|txt)$/i, '').replace(/_\d{8}$/, ''); }
-  function fileDate(name) { var m = /_(\d{8})\.(md|markdown|txt)$/i.exec(String(name || '')); return m ? m[1] : ''; }
+  function fileTitle(name) { return String(name || '').replace(/\.(md|markdown|txt)$/i, '').replace(/_\d{8}(\d{6})?$/, ''); }
+  function fileDate(name) { var m = /_(\d{8}(?:\d{6})?)\.(md|markdown|txt)$/i.exec(String(name || '')); return m ? m[1] : ''; }
   function fmtDate8(d) { return d ? d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8) : ''; }
   function fileNewerThan(a, b) {
-    var da = fileDate(a.name), db = fileDate(b.name);
+    // 日付（_yyyymmdd / _yyyymmddHHMMSS）は日の単位で比べ、同じ日なら更新が新しい方
+    var da = fileDate(a.name).slice(0, 8), db = fileDate(b.name).slice(0, 8);
     if (da !== db) return da > db;
     return String(a.modifiedTime || '') > String(b.modifiedTime || '');
   }
   function libGroups() {
     var map = {}, order = [];
     lib.files.forEach(function (f) {
-      var t = fileTitle(f.name);
-      if (!map[t]) { map[t] = { title: t, files: [], newest: f }; order.push(t); }
+      var t = (f.folder || '') + '|' + fileTitle(f.name);
+      if (!map[t]) { map[t] = { title: fileTitle(f.name), files: [], newest: f }; order.push(t); }
       map[t].files.push(f);
       if (fileNewerThan(f, map[t].newest)) map[t].newest = f;
     });
@@ -3851,7 +3880,7 @@ function greet(name) {
     var title = fileTitle(cur.name);
     var list = revs.map(function (v) { v.kind = 'rev'; v.label = fmtTime(v.time); return v; });
     lib.files.forEach(function (f) {
-      if (f.id === cur.id || fileTitle(f.name) !== title) return;
+      if (f.id === cur.id || fileTitle(f.name) !== title || (f.folder || '') !== (cur.folder || '')) return;
       if (fileDate(f.name) && fileDate(cur.name) && fileDate(f.name) > fileDate(cur.name)) return;   // 今より新しい日付は「前の版」ではない
       list.push({ kind: 'file', id: f.id, name: f.name, time: new Date(f.modifiedTime || 0).getTime(), size: f.size, by: f.lastModifiedBy || '',
         label: (fileDate(f.name) ? fmtDate8(fileDate(f.name)) + '版' : f.name) });
@@ -3868,8 +3897,9 @@ function greet(name) {
     return checkConflict(cur).then(function (ok) {
       // 開いていたファイルが他の人に更新されていれば、新しい日付のファイルを作る前にも知らせる
       if (!ok) return null;
-      return driveFindInFolder(name, libFolderId()).then(function (existing) {
-        if (!existing) return driveCreateText(name, text);
+      var dir = cur.folder || libFolderId();
+      return driveFindInFolder(name, dir).then(function (existing) {
+        if (!existing) return driveCreateText(name, text, cur.folder, cur.folderName);
         return driveFileMeta(existing).then(function (meta) {
           var ok2 = confirm('今日の版「' + name + '」はすでにあります。\n最終更新: ' + fmtTime(meta.modifiedTime) + (meta.lastModifiedBy ? '　' + meta.lastModifiedBy : '') +
             '\n\n上書きしますか？（前の内容は履歴に残ります）');
@@ -3879,6 +3909,7 @@ function greet(name) {
     });
   }
   function libAdopt(meta, text) {
+    if (meta.id && lib.current && lib.current.folder && !meta.folder) { meta.folder = lib.current.folder; meta.folderName = lib.current.folderName; }
     lib.current = meta.id ? meta : lib.current;
     lib.loadedText = text;
     driveFileId = lib.current.id;

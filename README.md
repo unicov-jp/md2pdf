@@ -107,3 +107,5 @@ flowchart LR
 - html2pdf.js：直接ダウンロード時のみ読み込み
 - html2canvas：表のPNG保存時のみ読み込み
 - Google Identity Services／Google Picker：Google Drive に接続したときのみ読み込み
+
+- 記事ごとのサブフォルダ（1階層）の .md も一覧に出します（images・99.・_ で始まるフォルダは除外）。日付は _yyyymmdd / _yyyymmddHHMMSS に対応。
