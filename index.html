@@ -275,8 +275,19 @@
   .st .tm-table td:last-child { text-align: right; }
   .st .tm-table td:last-child button { width: 100%; }
   .st .tm-table tfoot td { border-bottom: 0; padding-top: 10px; }
+  .st .tm-table td.em, .st .tm-table td.dr { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .st .tm-table td.dr { position: relative; overflow: visible; }
+  .st .tm-table td.dr .all { display: block; overflow: hidden; text-overflow: ellipsis; }
+  .st .tm-table td.dr .dr-btn { width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st .tm-table td.dr .dr-btn::after { content: ' \25BE'; color: var(--muted); }
+  .st .tm-table td.dr .dr-btn.none { color: #c1121f; }
+  .dr-pop { position: absolute; z-index: 10; top: calc(100% - 2px); right: 6px; width: 340px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 16px rgba(0, 0, 0, .18); padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+  .dr-pop[hidden] { display: none; }
+  .st .tm-table .dr-pop label { display: flex; align-items: center; gap: 6px; padding: 4px 6px; margin: 0; font-size: 12px; white-space: normal; line-height: 1.4; border-radius: 4px; cursor: pointer; }
+  .st .tm-table .dr-pop label:hover { background: var(--bg); }
   /* 設定・接続の設定 */
   .dlg-panel.st { width: 600px; }
+  #tm-dlg .dlg-panel.st { width: 720px; }
   .st .dlg-body { gap: 12px; background: var(--bg); }
   .st-group { display: flex; flex-direction: column; gap: 12px; }
   .st-group[hidden] { display: none; }
@@ -1604,11 +1615,11 @@ function greet(name) {
   function saveDriveCfg() {
     try { localStorage.setItem(DRIVE_CFG_KEY, JSON.stringify(driveCfg)); } catch (e) { /* ignore */ }
   }
-  function driveReady() { return !!(driveCfg.clientId && driveCfg.apiKey); }
+  function driveReady() { return !!driveCfg.clientId; }   // APIキーは「Drive から選ぶ」（Picker）のときだけ使う
   function requireDrive() {
     if (driveReady()) return Promise.resolve();
     openDriveSettings();
-    return Promise.reject(new Error('Google Drive を使うには「設定」の「接続の設定」でクライアントIDとAPIキーを入れてください'));
+    return Promise.reject(new Error('Google Drive を使うには「設定」の「接続の設定」でクライアントIDを入れてください'));
   }
   function ensureGsi() {
     if (window.google && window.google.accounts && window.google.accounts.oauth2) return Promise.resolve();
@@ -1674,6 +1685,7 @@ function greet(name) {
     setDriveState();
   }
   function ensurePicker() {
+    if (!driveCfg.apiKey) { openDriveSettings(); return Promise.reject(new Error('「Drive から選ぶ」には「接続の設定」で APIキーを入れてください')); }
     if (window.google && window.google.picker) return Promise.resolve();
     if (pickerLoading) return pickerLoading;
     pickerLoading = (window.gapi ? Promise.resolve() : loadScript(GAPI_URL)).then(function () {
@@ -1824,6 +1836,7 @@ function greet(name) {
     document.getElementById('gd-signout').hidden = !driveToken;
   }
   function openDriveSettings() {
+    if (teamMode && role !== 'master' && driveReady()) return;   // マスター以外は接続の設定を触れない
     document.getElementById('gd-client').value = driveCfg.clientId || '';
     document.getElementById('gd-key').value = driveCfg.apiKey || '';
     document.getElementById('gd-app').value = driveCfg.appId || '';
@@ -1849,7 +1862,7 @@ function greet(name) {
     driveCfg.appId = document.getElementById('gd-app').value.trim();
     saveDriveCfg();
     setDriveState();
-    setStatus(driveReady() ? 'Google Drive の設定を保存しました' : 'クライアントIDとAPIキーの両方が必要です');
+    setStatus(driveReady() ? 'Google Drive の設定を保存しました' : 'クライアントIDを入れてください');
     libRefreshButtons();
     if (driveReady()) closeDriveSettings();
     if (!tmDlg.hidden) tmRefresh();
@@ -2607,7 +2620,7 @@ function greet(name) {
       var e = document.createElement('li');
       e.className = 'empty';
       e.textContent = lib.files.length ? '一致するファイルがありません'
-        : !driveReady() ? '「設定」の「接続の設定」でクライアントIDとAPIキーを入れてください'
+        : !driveReady() ? '「設定」の「接続の設定」でクライアントIDを入れてください'
         : !driveCfg.folderId ? '「設定」でフォルダ（URL）を指定してください'
         : !lib.loaded ? 'Google Drive に接続してください'
         : (driveCfg.scope === 'full' ? 'このフォルダに .md がありません' : 'このフォルダに、このツールから見える .md がありません（「ファイルを追加」で加えるか、「設定」の「接続の設定」で権限を drive にする）');
@@ -3502,7 +3515,7 @@ function greet(name) {
   }
   function gateHide() { gateEl.hidden = true; }
   document.getElementById('gate-connect').addEventListener('click', function () {
-    if (!driveReady()) { gateShow('md2pdf-config.json にクライアントIDとAPIキーがありません。管理者（マスター）に確認してください'); if (teamMasters.length) openDriveSettings(); return; }
+    if (!driveReady()) { gateShow('md2pdf-config.json にクライアントIDがありません。管理者（マスター）に確認してください'); if (teamMasters.length) openDriveSettings(); return; }
     this.disabled = true;
     libConnect();
   });
@@ -3619,7 +3632,7 @@ function greet(name) {
       var el = document.querySelector(sel);
       if (!el) return;
       var hide = role ? ROLE_HIDE[role].indexOf(sel) >= 0 : teamMode;
-      if (sel === '#btn-users') hide = !!role && role !== 'master';   // 設定は、接続前でも、マスター（制限なしのときは全員）に出す
+      if (sel === '#btn-users') hide = teamMode ? role !== 'master' : (!!role && role !== 'master');   // 名簿の運用中はマスターだけ   // 設定は、接続前でも、マスター（制限なしのときは全員）に出す
       if (sel === '#btn-drive-settings') { el.hidden = true; return; }   // 接続の設定は「設定」から開く
       if (sel === '#rv-grp') { el.hidden = role !== 'master' || !rvMarks().length; return; }
       if (sel === '#lib-add-drive') { if (hide) el.hidden = true; return; }   // 出すかどうかは libRefreshButtons が決める
@@ -3700,7 +3713,7 @@ function greet(name) {
   var tmWork = null;   // { users: [], drives: [] } 編集中の控え（接続していない／マスターでないときは null）
   function tmSt(msg) { document.getElementById('tm-state').textContent = msg || ''; }
   function openTeamDlg() {
-    if (role && role !== 'master') return;
+    if (teamMode ? role !== 'master' : (role && role !== 'master')) return;
     tmSt('');
     tmDlg.hidden = false;
     tmRefresh();
@@ -3715,7 +3728,7 @@ function greet(name) {
     document.getElementById('tm-root').textContent = driveCfg.folderId ? (driveCfg.folderName || driveCfg.folderId) : '（未設定）';
     var msg = document.getElementById('tm-roster-msg');
     var box = document.getElementById('tm-roster');
-    var why = !driveReady() ? '「接続の設定」でクライアントIDとAPIキーを入れてください'
+    var why = !driveReady() ? '「接続の設定」でクライアントIDを入れてください'
       : !connected ? 'Google Drive に接続すると、ドライブとユーザーを設定できます'
       : !driveCfg.folderId ? '名簿の保存先フォルダの URL を入れて「変更」を押してください'
       : (role && role !== 'master') ? 'ドライブとユーザーはマスターだけが設定できます' : '';
@@ -3780,6 +3793,10 @@ function greet(name) {
       .catch(function (e) { tmSt('取り込めませんでした: ' + ((e && e.message) || e)); });
   });
   document.getElementById('tm-conn').addEventListener('click', function () { openDriveSettings(); });
+  // 担当フォルダの一覧は、外をクリックしたら閉じる
+  document.addEventListener('click', function () {
+    Array.prototype.forEach.call(document.querySelectorAll('#tm-users .dr-pop'), function (x) { x.hidden = true; });
+  });
   function closeTeamDlg() { tmDlg.hidden = true; tmWork = null; }
   function tmRender() {
     var tb = document.getElementById('tm-users');
@@ -3792,7 +3809,7 @@ function greet(name) {
     }
     tmWork.users.forEach(function (u, i) {
       var tr = document.createElement('tr');
-      var td1 = document.createElement('td'); td1.className = 'em'; td1.textContent = u.email;
+      var td1 = document.createElement('td'); td1.className = 'em'; td1.textContent = u.email; td1.title = u.email;
       var td2 = document.createElement('td');
       var nm = document.createElement('input'); nm.type = 'text'; nm.value = u.name;
       nm.addEventListener('input', function () { u.name = nm.value; });
@@ -3808,21 +3825,43 @@ function greet(name) {
       var tdD = document.createElement('td'); tdD.className = 'dr';
       if (u.role === 'client') {
         if (!tmWork.drives.length) { var na = document.createElement('span'); na.className = 'all'; na.textContent = 'フォルダ未登録'; tdD.appendChild(na); }
-        tmWork.drives.forEach(function (d) {
-          var lb = document.createElement('label');
-          var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = d.id; cb.checked = u.drives.indexOf(d.id) >= 0;
-          cb.addEventListener('change', function () {
-            u.drives = u.drives.filter(function (x) { return x !== d.id; });
-            if (cb.checked) u.drives.push(d.id);
+        // 1行に収める: 選んだフォルダを要約したボタン。押すとチェックの一覧が開く
+        if (tmWork.drives.length) {
+          var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'dr-btn';
+          var pop = document.createElement('div'); pop.className = 'dr-pop'; pop.hidden = true;
+          var shortName = function (n) { var k = n.lastIndexOf(' > '); return k > 0 ? n.slice(0, k) : n; };
+          var sum = function () {
+            var sel = tmWork.drives.filter(function (d) { return u.drives.indexOf(d.id) >= 0; });
+            btn.textContent = !sel.length ? '未選択' : shortName(sel[0].name) + (sel.length > 1 ? ' ほか' + (sel.length - 1) + '件' : '');
+            btn.title = sel.map(function (d) { return d.name; }).join('\n') || '担当フォルダを選ぶ';
+            btn.classList.toggle('none', !sel.length);
+          };
+          tmWork.drives.forEach(function (d) {
+            var lb = document.createElement('label');
+            var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = d.id; cb.checked = u.drives.indexOf(d.id) >= 0;
+            cb.addEventListener('change', function () {
+              u.drives = u.drives.filter(function (x) { return x !== d.id; });
+              if (cb.checked) u.drives.push(d.id);
+              sum();
+            });
+            lb.appendChild(cb); lb.appendChild(document.createTextNode(d.name));
+            pop.appendChild(lb);
           });
-          lb.appendChild(cb); lb.appendChild(document.createTextNode(d.name));
-          tdD.appendChild(lb);
-        });
+          btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var open = pop.hidden;
+            Array.prototype.forEach.call(document.querySelectorAll('#tm-users .dr-pop'), function (x) { x.hidden = true; });
+            pop.hidden = !open;
+          });
+          pop.addEventListener('click', function (e) { e.stopPropagation(); });
+          sum();
+          tdD.appendChild(btn); tdD.appendChild(pop);
+        }
       } else {
         var al = document.createElement('span'); al.className = 'all'; al.textContent = 'すべて'; tdD.appendChild(al);
       }
       var td4 = document.createElement('td');
-      var del = document.createElement('button'); del.type = 'button'; del.textContent = '削除';
+      var del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.textContent = '削除';
       del.addEventListener('click', function () { tmWork.users.splice(i, 1); tmRender(); });
       td4.appendChild(del);
       tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(tdD); tr.appendChild(td4);
