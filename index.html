@@ -230,7 +230,14 @@
   #lib-list li:hover { background: rgba(37, 99, 235, .08); }
   #lib-list li.sel { background: rgba(37, 99, 235, .16); box-shadow: inset 3px 0 0 var(--accent); }
   #lib-list li .fn { display: block; word-break: break-all; }
-  #lib-list li .meta { color: var(--muted); font-size: 11px; }
+  #lib-list li .meta { color: var(--muted); font-size: 11px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #lib-list li .row2 { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+  #lib-list li .st-sel { flex: 0 0 auto; font-size: 11px; padding: 1px 4px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); cursor: pointer; }
+  #lib-list li .st-sel:disabled { cursor: default; opacity: 1; }
+  #lib-list li .st-sel[data-st="draft"] { color: #b45309; border-color: #f59e0b; }
+  #lib-list li .st-sel[data-st="review"] { color: #7c3aed; border-color: #a78bfa; }
+  #lib-list li .st-sel[data-st="ready"] { color: #1d4ed8; border-color: #60a5fa; }
+  #lib-list li .st-sel[data-st="posted"] { color: #15803d; border-color: #22c55e; background: rgba(34, 197, 94, .12); }
   #lib-list li .meta a { color: var(--accent); text-decoration: none; margin-left: 6px; }
   #lib-list li.dirty .fn::after { content: ' ●'; color: #d97706; }
   #lib-list li.empty { color: var(--muted); cursor: default; }
@@ -2524,7 +2531,7 @@ function greet(name) {
   var btnUpdate = document.getElementById('btn-update');
   var btnRollback = document.getElementById('btn-rollback');
   var LIB_OPEN_KEY = 'md2pdf:lib:open';
-  var FILE_FIELDS = 'id,name,mimeType,modifiedTime,size,version,webViewLink,lastModifyingUser(displayName)';
+  var FILE_FIELDS = 'id,name,mimeType,modifiedTime,size,version,webViewLink,lastModifyingUser(displayName),appProperties';
   var imgCache = {};        // 相対パス -> objectURL（一覧のフォルダの画像）
   var driveChildCache = {}; // "親ID/名前" -> ID
   var teamCfgLoaded = false;
@@ -2577,7 +2584,8 @@ function greet(name) {
   function fileFromMeta(f) {
     return {
       id: f.id, name: f.name, modifiedTime: f.modifiedTime || '', size: f.size, version: f.version || '',
-      webViewLink: f.webViewLink || '', lastModifiedBy: (f.lastModifyingUser && f.lastModifyingUser.displayName) || ''
+      webViewLink: f.webViewLink || '', lastModifiedBy: (f.lastModifyingUser && f.lastModifyingUser.displayName) || '',
+      status: (f.appProperties && f.appProperties.md2pdfStatus) || ''
     };
   }
   // 記事ごとのサブフォルダ（1階層）の .md も一覧に出す。images・99.（古い版置き場）などは除く
@@ -2607,6 +2615,13 @@ function greet(name) {
       '&fields=files(' + FILE_FIELDS + ')&orderBy=name&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true')
       .then(function (r) { return r.json(); })
       .then(function (j) { return (j.files || []).filter(function (f) { return isTextName(f.name); }).map(fileFromMeta); });
+  }
+  // 記事のステータス（投稿済みなど）: ファイルの appProperties に入れる（チームで共有。本文は変えない）
+  var FILE_STATUSES = [['', '未設定'], ['draft', '執筆中'], ['review', '確認中'], ['ready', '投稿待ち'], ['posted', '投稿済み']];
+  function driveSetStatus(id, st) {
+    return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?supportsAllDrives=true&fields=id,appProperties',
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appProperties: { md2pdfStatus: st || null } }) })
+      .then(function (r) { return r.json(); });
   }
   function driveFileMeta(id) {
     return driveGetMeta(id, FILE_FIELDS).then(fileFromMeta);
@@ -2775,8 +2790,36 @@ function greet(name) {
         a.addEventListener('click', function (e) { e.stopPropagation(); });
         meta.appendChild(a);
       }
+      // ステータス（同じタイトルの中で、最新のファイルに付いたもの。無ければ他の版に付いたもの）
+      var stv = f.status || (g.files.filter(function (x) { return x.status; })[0] || {}).status || '';
+      var stSel = document.createElement('select');
+      stSel.className = 'st-sel';
+      stSel.title = '記事のステータス';
+      FILE_STATUSES.forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; if (o[0] === stv) op.selected = true; stSel.appendChild(op); });
+      stSel.setAttribute('data-st', stv);
+      stSel.disabled = role === 'client';
+      stSel.addEventListener('click', function (e) { e.stopPropagation(); });
+      stSel.addEventListener('change', function (e) {
+        e.stopPropagation();
+        var v = stSel.value, old = stv;
+        stSel.setAttribute('data-st', v);
+        stSel.disabled = true;
+        driveSetStatus(f.id, v).then(function () {
+          g.files.forEach(function (x) { x.status = x.id === f.id ? v : x.status; });
+          if (lib.current && lib.current.id === f.id) lib.current.status = v;
+          stv = v;
+          setStatus('ステータスを「' + stSel.options[stSel.selectedIndex].text + '」にしました: ' + g.title);
+        }).catch(function (err) {
+          stSel.value = old; stSel.setAttribute('data-st', old);
+          setStatus('ステータスを変えられませんでした: ' + ((err && err.message) || err));
+        }).then(function () { stSel.disabled = role === 'client'; });
+      });
+      var row2 = document.createElement('span');
+      row2.className = 'row2';
+      row2.appendChild(meta);
+      row2.appendChild(stSel);
       li.appendChild(fn);
-      li.appendChild(meta);
+      li.appendChild(row2);
       li.addEventListener('click', function () { libOpenFile(f); });
       libListEl.appendChild(li);
       shown++;
