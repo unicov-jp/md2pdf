@@ -54,6 +54,16 @@
   header.toolbar #status { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
   header.toolbar .spacer { flex: 0 0 0; }
   #ed-insert { width: 8em; }
+  /* Google Drive から開く */
+  #od-q { width: 100%; }
+  .od-list { list-style: none; margin: 0; padding: 0; max-height: 55vh; overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+  .od-list li { padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .od-list li:last-child { border-bottom: 0; }
+  .od-list li:hover { background: var(--bg); }
+  .od-list li .nm { display: block; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .od-list li .mt { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .od-list li.empty { cursor: default; color: var(--muted); font-size: 12px; }
+  .od-list li.empty:hover { background: transparent; }
   /* 開く・保存のメニュー */
   .menu { position: relative; display: inline-flex; }
   .menu[hidden] { display: none; }
@@ -740,6 +750,18 @@
       </details>
 
       <div class="st-foot"><button type="button" id="gd-close">閉じる</button><button type="button" id="gd-save" class="primary">保存</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Google Drive から開く（APIキー不要: 接続中の権限で検索する） -->
+<div id="od-dlg" class="dlg no-print" hidden>
+  <div class="dlg-panel narrow st" role="dialog" aria-label="Google Drive から開く">
+    <div class="dlg-bar"><strong>Google Drive から開く</strong></div>
+    <div class="dlg-body">
+      <input type="text" id="od-q" class="wide" placeholder="ファイル名で検索" spellcheck="false" autocomplete="off">
+      <ul id="od-list" class="od-list"></ul>
+      <div class="st-foot"><span id="od-state" class="muted"></span><span class="spacer"></span><button type="button" id="od-close">閉じる</button></div>
     </div>
   </div>
 </div>
@@ -1964,22 +1986,57 @@ function greet(name) {
   document.getElementById('gd-signout').addEventListener('click', function () { driveSignOut(); setStatus('Google との接続を解除しました'); });
 
   // Drive から .md を開く
-  function openFromDrive() {
-    pickDrive('md').then(function (f) {
-      if (!f) return;
-      if (!/\.(md|markdown|txt)$/i.test(f.name) && !/^text\//.test(f.mimeType || '') && !confirm('Markdown ではないかもしれません（' + f.name + '）。開きますか？')) return;
-      setStatus('Google Drive から読み込み中...');
-      return driveDownload(f.id).then(function (blob) { return blob.text(); }).then(function (text) {
-        driveFileId = f.id;
-        openText(text, f.name);
-        // 一覧のフォルダは変えない（チームの正本のまま）。開いたファイルは Update／Rollback できる
-        return driveFileMeta(f.id).catch(function () { return { id: f.id, name: f.name }; }).then(function (meta) {
-          libSelect(meta, text);
-          setStatus('Google Drive から読み込みました: ' + f.name);
+  // Google Drive の .md を検索して開く（Google の選択画面は使わないので APIキーは不要）
+  var odDlg = document.getElementById('od-dlg');
+  var odQ = document.getElementById('od-q');
+  var odList = document.getElementById('od-list');
+  var odTimer = null, odSeq = 0;
+  function odSt(m) { document.getElementById('od-state').textContent = m || ''; }
+  function odSearch() {
+    var term = odQ.value.trim();
+    var seq = ++odSeq;
+    var q = "trashed = false and mimeType != 'application/vnd.google-apps.folder' and (name contains '.md' or name contains '.markdown' or mimeType = 'text/markdown')";
+    if (term) q += " and name contains '" + term.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+    odSt('検索中...');
+    return driveFetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) +
+      '&fields=' + encodeURIComponent('files(id,name,mimeType,modifiedTime,parents,lastModifyingUser(displayName))') +
+      '&orderBy=modifiedTime%20desc&pageSize=50&corpora=allDrives&supportsAllDrives=true&includeItemsFromAllDrives=true')
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (seq !== odSeq) return;
+        var lt = term.toLowerCase();
+        var files = (j.files || []).filter(function (f) { return isTextName(f.name) && (!lt || f.name.toLowerCase().indexOf(lt) >= 0); });
+        odList.innerHTML = '';
+        if (!files.length) { var e = document.createElement('li'); e.className = 'empty'; e.textContent = term ? '見つかりません' : '.md ファイルがありません'; odList.appendChild(e); }
+        files.forEach(function (f) {
+          var li = document.createElement('li');
+          var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = f.name; nm.title = f.name;
+          var mt = document.createElement('span'); mt.className = 'mt';
+          mt.textContent = fmtTime(f.modifiedTime) + (f.lastModifyingUser && f.lastModifyingUser.displayName ? '　' + f.lastModifyingUser.displayName : '');
+          li.appendChild(nm); li.appendChild(mt);
+          li.addEventListener('click', function () {
+            closeOpenDrive();
+            // 記事のフォルダ（画像の相対パス・保存先）を引き継いで開く
+            libOpenFile({ id: f.id, name: f.name, folder: (f.parents && f.parents[0] !== libFolderId()) ? f.parents[0] : '' });
+          });
+          odList.appendChild(li);
         });
-      });
-    }).catch(function (e) { setStatus((e && e.message) || String(e)); });
+        odSt(files.length ? files.length + '件' + (files.length >= 50 ? '（新しい順に50件まで。名前で絞り込めます）' : '') : '');
+      }).catch(function (e) { if (seq === odSeq) odSt('検索できませんでした: ' + ((e && e.message) || e)); });
   }
+  function openFromDrive() {
+    if (!driveReady()) { setStatus('Google Drive に接続できません（管理者に確認してください）'); return; }
+    odDlg.hidden = false;
+    odQ.value = '';
+    odList.innerHTML = '';
+    odQ.focus();
+    odSearch();
+  }
+  function closeOpenDrive() { odDlg.hidden = true; odSeq++; }
+  odQ.addEventListener('input', function () { clearTimeout(odTimer); odTimer = setTimeout(odSearch, 300); });
+  odQ.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); var li = odList.querySelector('li:not(.empty)'); if (li) li.click(); } });
+  document.getElementById('od-close').addEventListener('click', closeOpenDrive);
+  odDlg.addEventListener('click', function (e) { if (e.target === odDlg) closeOpenDrive(); });
   document.getElementById('btn-open-drive').addEventListener('click', openFromDrive);
 
   /* ---------- 表 → PNG（note用の画像） ---------- */
@@ -2453,6 +2510,7 @@ function greet(name) {
     else if (!gdDlg.hidden) { closeDriveSettings(); closed = true; }
     else if (!saveDlg.hidden) { closeSaveDlg(); closed = true; }
     else if (!tpngEl.hidden) { closeTablePng(); closed = true; }
+    else if (!odDlg.hidden) { closeOpenDrive(); closed = true; }
     return closed;
   }
 
