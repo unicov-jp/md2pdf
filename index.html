@@ -453,11 +453,7 @@
   <button type="button" id="btn-lib" title="左のファイル一覧を出す／隠す">一覧</button>
   <button type="button" id="btn-new">新規</button>
   <span class="menu" id="m-open">
-    <button type="button" class="menu-btn" aria-haspopup="true">開く ▾</button>
-    <span class="menu-list" hidden>
-      <button type="button" data-act="open-drive">Google Drive から</button>
-      <button type="button" data-act="open-local">このパソコンから</button>
-    </span>
+    <button type="button" class="menu-btn" title="このパソコンの .md を開く">開く</button>
   </span>
   <span class="menu" id="m-save">
     <button type="button" class="menu-btn primary" aria-haspopup="true">保存 ▾</button>
@@ -1611,12 +1607,14 @@ function greet(name) {
   function menuClose() { Array.prototype.forEach.call(document.querySelectorAll('.menu-list'), function (l) { l.hidden = true; }); }
   function menuSync() {
     var hid = function (id) { var el = document.getElementById(id); return !el || el.hidden; };
-    var od = document.querySelector('#m-open [data-act="open-drive"]'), ol = document.querySelector('#m-open [data-act="open-local"]');
-    od.hidden = hid('btn-open-drive'); ol.hidden = hid('btn-open');
-    document.getElementById('m-open').hidden = od.hidden && ol.hidden;
+    document.getElementById('m-open').hidden = hid('btn-open');   // クライアントは出さない
   }
   Array.prototype.forEach.call(document.querySelectorAll('.menu'), function (m) {
     var list = m.querySelector('.menu-list');
+    if (!list) {   // 開く: このパソコンの .md を開く（Google Drive のファイルは左の一覧から開く）
+      m.querySelector('.menu-btn').addEventListener('click', function () { menuClose(); document.getElementById('btn-open').click(); });
+      return;
+    }
     m.querySelector('.menu-btn').addEventListener('click', function (e) {
       e.stopPropagation();
       var open = list.hidden;
@@ -1722,7 +1720,6 @@ function greet(name) {
   function driveReady() { return !!driveCfg.clientId; }   // APIキーは「Drive から選ぶ」（Picker）のときだけ使う
   function requireDrive() {
     if (driveReady()) return Promise.resolve();
-    openDriveSettings();
     return Promise.reject(new Error('Google Drive を使うには「設定」の「接続の設定」でクライアントIDを入れてください'));
   }
   function ensureGsi() {
@@ -1789,7 +1786,7 @@ function greet(name) {
     setDriveState();
   }
   function ensurePicker() {
-    if (!driveCfg.apiKey) { openDriveSettings(); return Promise.reject(new Error('「Drive から選ぶ」には「接続の設定」で APIキーを入れてください')); }
+    if (!driveCfg.apiKey) return Promise.reject(new Error('Google Drive のファイル選択には APIキーが必要です（「設定」の「接続の設定」で入れてください）'));
     if (window.google && window.google.picker) return Promise.resolve();
     if (pickerLoading) return pickerLoading;
     pickerLoading = (window.gapi ? Promise.resolve() : loadScript(GAPI_URL)).then(function () {
@@ -3065,7 +3062,7 @@ function greet(name) {
     }).catch(function () { /* ignore */ });
   }
   function libConnect() {
-    if (!driveReady()) { openDriveSettings(); return; }
+    if (!driveReady()) { setStatus('「設定」の「接続の設定」でクライアントIDを入れてください'); return; }
     var btn = document.getElementById('lib-connect-btn');
     btn.disabled = true;
     setStatus('Google に接続中...');
@@ -3778,7 +3775,7 @@ function greet(name) {
   }
   function gateHide() { gateEl.hidden = true; }
   document.getElementById('gate-connect').addEventListener('click', function () {
-    if (!driveReady()) { gateShow('md2pdf-config.json にクライアントIDがありません。管理者（マスター）に確認してください'); if (teamMasters.length) openDriveSettings(); return; }
+    if (!driveReady()) { gateShow('md2pdf-config.json にクライアントIDがありません。管理者（マスター）に確認してください'); return; }
     this.disabled = true;
     libConnect();
   });
