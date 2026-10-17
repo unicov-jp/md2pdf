@@ -224,6 +224,10 @@
   .lib-sub a { color: var(--accent); text-decoration: none; }
   .lib-connect { padding: 12px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
   .lib-connect[hidden] { display: none; }
+  .lib-filters { display: flex; gap: 6px; align-items: center; margin: 6px 12px; }
+  .lib-filters #lib-filter { flex: 1; min-width: 0; margin: 0; }
+  #lib-st-filter.on { border-color: var(--accent); color: var(--accent); }
+  #lib-st-filter { flex: 0 0 auto; font-size: 12px; padding: 3px 4px; max-width: 9.5em; }
   #lib-filter { margin: 6px 12px; padding: 4px 8px; font: inherit; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--editor-bg); color: var(--text); }
   #lib-list { flex: 1; overflow: auto; list-style: none; margin: 0; padding: 0; min-height: 80px; }
   #lib-list li { padding: 6px 12px; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 1.4; }
@@ -518,7 +522,10 @@
       <span id="lib-connect-msg">Google に接続すると一覧を読み込みます</span>
       <button type="button" id="lib-connect-btn" class="primary">Google Drive に接続</button>
     </div>
-    <input type="text" id="lib-filter" placeholder="絞り込み（ファイル名）" spellcheck="false">
+    <div class="lib-filters">
+      <input type="text" id="lib-filter" placeholder="絞り込み（ファイル名）" spellcheck="false">
+      <select id="lib-st-filter" title="ステータスで絞り込む"></select>
+    </div>
     <ul id="lib-list"><li class="empty">Google Drive に接続してください</li></ul>
     <div class="lib-foot">
       <button type="button" id="lib-new" title="いま編集している内容を、新しいファイルとしてチームのフォルダに作る">一覧に追加（新規ファイル）</button>
@@ -2527,6 +2534,23 @@ function greet(name) {
   var libListEl = document.getElementById('lib-list');
   var libVerListEl = document.getElementById('lib-ver-list');
   var libFilterEl = document.getElementById('lib-filter');
+  var libStFilterEl = document.getElementById('lib-st-filter');
+  var FILE_STATUSES = [['', '未設定'], ['draft', '執筆中'], ['review', '確認中'], ['ready', '投稿待ち'], ['posted', '投稿済み']];
+  // ステータスの絞り込み（記事の数つき。選んだものはこの端末に覚える）
+  function groupStatus(g) { return g.newest.status || (g.files.filter(function (x) { return x.status; })[0] || {}).status || ''; }
+  function libStMatch(st, sf) { return sf === 'none' ? !st : sf === 'notposted' ? st !== 'posted' : st === sf; }
+  function libStFilterSync(groups) {
+    var cur = libStFilterEl.value;
+    if (!libStFilterEl.options.length) { try { cur = localStorage.getItem('md2pdf-st-filter') || ''; } catch (e) { cur = ''; } }
+    var sts = groups.map(groupStatus);
+    var cnt = function (sf) { return sts.filter(function (x) { return libStMatch(x, sf); }).length; };
+    var opts = [['', 'すべて（' + groups.length + '）'], ['notposted', '投稿済み以外（' + cnt('notposted') + '）']];
+    FILE_STATUSES.forEach(function (o) { var v = o[0] || 'none'; opts.push([v, o[1] + '（' + cnt(v) + '）']); });
+    libStFilterEl.innerHTML = '';
+    opts.forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; libStFilterEl.appendChild(op); });
+    libStFilterEl.value = opts.some(function (o) { return o[0] === cur; }) ? cur : '';
+    libStFilterEl.classList.toggle('on', !!libStFilterEl.value);
+  }
   var libConnectEl = document.getElementById('lib-connect');
   var btnUpdate = document.getElementById('btn-update');
   var btnRollback = document.getElementById('btn-rollback');
@@ -2617,7 +2641,6 @@ function greet(name) {
       .then(function (j) { return (j.files || []).filter(function (f) { return isTextName(f.name); }).map(fileFromMeta); });
   }
   // 記事のステータス（投稿済みなど）: ファイルの appProperties に入れる（チームで共有。本文は変えない）
-  var FILE_STATUSES = [['', '未設定'], ['draft', '執筆中'], ['review', '確認中'], ['ready', '投稿待ち'], ['posted', '投稿済み']];
   function driveSetStatus(id, st) {
     return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?supportsAllDrives=true&fields=id,appProperties',
       { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appProperties: { md2pdfStatus: st || null } }) })
@@ -2763,12 +2786,16 @@ function greet(name) {
 
   function libRenderList() {
     var q = (libFilterEl.value || '').trim().toLowerCase();
+    var sf = libStFilterEl.value;   // '' すべて / 'none' 未設定 / 'notposted' 投稿済み以外 / ステータスの値
     libListEl.innerHTML = '';
     var shown = 0;
+    var groups = libGroups();
+    libStFilterSync(groups);
     // 第5版: タイトルごとに、日付（_yyyymmdd）が最新のファイルだけを出す
-    libGroups().forEach(function (g) {
+    groups.forEach(function (g) {
       var f = g.newest;
       if (q && g.title.toLowerCase().indexOf(q) < 0 && f.name.toLowerCase().indexOf(q) < 0) return;
+      if (sf && !libStMatch(groupStatus(g), sf)) return;
       var li = document.createElement('li');
       li.setAttribute('data-name', f.name);
       li.setAttribute('data-id', f.id);
@@ -2791,7 +2818,7 @@ function greet(name) {
         meta.appendChild(a);
       }
       // ステータス（同じタイトルの中で、最新のファイルに付いたもの。無ければ他の版に付いたもの）
-      var stv = f.status || (g.files.filter(function (x) { return x.status; })[0] || {}).status || '';
+      var stv = groupStatus(g);
       var stSel = document.createElement('select');
       stSel.className = 'st-sel';
       stSel.title = '記事のステータス';
@@ -2808,6 +2835,7 @@ function greet(name) {
           g.files.forEach(function (x) { x.status = x.id === f.id ? v : x.status; });
           if (lib.current && lib.current.id === f.id) lib.current.status = v;
           stv = v;
+          if (libStFilterEl.value) libRenderList(); else libStFilterSync(libGroups());   // 絞り込み中なら一覧を出し直す
           setStatus('ステータスを「' + stSel.options[stSel.selectedIndex].text + '」にしました: ' + g.title);
         }).catch(function (err) {
           stSel.value = old; stSel.setAttribute('data-st', old);
@@ -2827,7 +2855,7 @@ function greet(name) {
     if (!shown) {
       var e = document.createElement('li');
       e.className = 'empty';
-      e.textContent = lib.files.length ? '一致するファイルがありません'
+      e.textContent = lib.files.length ? (libStFilterEl.value ? 'この条件の記事はありません' : '一致するファイルがありません')
         : !driveReady() ? '「設定」の「接続の設定」でクライアントIDを入れてください'
         : !driveCfg.folderId ? '「設定」でフォルダ（URL）を指定してください'
         : !lib.loaded ? 'Google Drive に接続してください'
@@ -3136,6 +3164,10 @@ function greet(name) {
   });
   document.getElementById('lib-new').addEventListener('click', libNewFile);
   libFilterEl.addEventListener('input', libRenderList);
+  libStFilterEl.addEventListener('change', function () {
+    try { localStorage.setItem('md2pdf-st-filter', libStFilterEl.value); } catch (e) { /* ignore */ }
+    libRenderList();
+  });
   btnUpdate.addEventListener('click', function () { libUpdate(); });
   btnRollback.addEventListener('click', function () { libRollback(); });
   document.getElementById('gd-reset').addEventListener('click', function () {
