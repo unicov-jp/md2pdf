@@ -320,7 +320,8 @@
   .st .tm-table td input[type="text"], .st .tm-table td select, .st .tm-table td button { font-size: 12px; padding: 4px 6px; height: 28px; }
   .st .tm-table td:last-child { text-align: right; }
   .st .tm-table td:last-child button { width: 100%; }
-  .st .tm-table tfoot td { border-bottom: 0; padding-top: 10px; }
+  .st .tm-table tfoot td { border-bottom: 0; padding-top: 4px; }
+  .st .tm-table tr.tm-addhead td { text-align: left !important; padding-top: 14px; font-size: 12px; font-weight: 700; color: var(--muted); border-top: 1px dashed var(--border); }
   .st .tm-table td.em, .st .tm-table td.dr { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .st .tm-table td.dr { position: relative; overflow: visible; }
   .st .tm-table td.dr .all { display: block; overflow: hidden; text-overflow: ellipsis; }
@@ -664,7 +665,7 @@
             <colgroup><col class="c-em"><col class="c-nm"><col class="c-rl"><col class="c-dr"><col class="c-bt"></colgroup>
             <thead><tr><th>メールアドレス</th><th>名前</th><th>役割</th><th>担当フォルダ</th><th></th></tr></thead>
             <tbody id="tm-users"></tbody>
-            <tfoot><tr class="tm-addrow">
+            <tfoot><tr class="tm-addhead"><td colspan="5">ユーザーを追加</td></tr><tr class="tm-addrow">
               <td><input type="text" id="tm-email" placeholder="メールアドレス" spellcheck="false" autocomplete="off"></td>
               <td><input type="text" id="tm-name" placeholder="名前" autocomplete="off"></td>
               <td><select id="tm-role">
@@ -672,8 +673,8 @@
                 <option value="client">クライアント</option>
                 <option value="master">マスター</option>
               </select></td>
-              <td></td>
-              <td><button type="button" id="tm-add">追加</button></td>
+              <td class="dr" id="tm-add-drives"></td>
+              <td><button type="button" id="tm-add" class="primary">追加</button></td>
             </tr></tfoot>
           </table>
           <label class="st-check"><input type="checkbox" id="tm-share" checked> Google Drive の共有も設定する</label>
@@ -4055,10 +4056,11 @@ function greet(name) {
     if (teamMode ? role !== 'master' : (role && role !== 'master')) return;
     tmSt('');
     tmDlg.hidden = false;
-    tmRefresh();
+    tmWork = null;
+    tmRefresh(true);
   }
   // 接続の状態・ルートフォルダ・名簿の編集欄を、今の状態に合わせる
-  function tmRefresh() {
+  function tmRefresh(rebuild) {
     var connected = libConnectedNow();
     var st = document.getElementById('tm-conn-state');
     st.textContent = connected ? ('接続中' + (lib.user && lib.user.emailAddress ? '（' + lib.user.emailAddress + '）' : '')) : (driveReady() ? '未接続' : '未設定');
@@ -4079,6 +4081,8 @@ function greet(name) {
     var ready = team.loaded ? Promise.resolve() : teamLoad().catch(function (e) { tmSt('名簿を読めませんでした: ' + ((e && e.message) || e)); });
     return ready.then(function () {
       if (tmDlg.hidden) return;
+      // 編集中（保存前）の内容は残す。接続の取り直しなどで画面を作り直しても、追加したユーザーが消えないように
+      if (tmWork && !rebuild) { tmRender(); return; }
       tmWork = { users: team.users.map(function (u) { return { email: u.email, name: u.name, role: u.role, drives: (u.drives || []).slice() }; }), drives: team.drives.map(function (d) { return { id: d.id, name: d.name }; }) };
       // まだマスターがいない（制限なし）ときは、いま接続している自分を最初のマスターにする
       var me = lib.user && lowerMail(lib.user.emailAddress);
@@ -4117,7 +4121,7 @@ function greet(name) {
       lib.current = null; lib.loadedText = null; persistCurrent();
       lib.loaded = false;
       tmSt('名簿の保存先を設定しました: ' + j.name);
-      return libReload().then(function () { return tmRefresh(); });
+      return libReload().then(function () { return tmRefresh(true); });
     }).catch(function (e) { tmSt('このフォルダは設定できません（' + ((e && e.message) || e) + '）。URL と、あなたに閲覧権限があるかを確認してください'); });
   });
   document.getElementById('tm-root-url').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tm-root-set').click(); } });
@@ -4132,15 +4136,59 @@ function greet(name) {
       teamRenderDrives();
       lib.loaded = false;
       return libReload();
-    }).then(function () { tmSt('取り込みました（' + lib.files.length + ' ファイル）'); return tmRefresh(); })
+    }).then(function () { tmSt('取り込みました（' + lib.files.length + ' ファイル）'); return tmRefresh(true); })
       .catch(function (e) { tmSt('取り込めませんでした: ' + ((e && e.message) || e)); });
   });
   document.getElementById('tm-conn').addEventListener('click', function () { openDriveSettings(); });
   // 担当フォルダの一覧は、外をクリックしたら閉じる
   document.addEventListener('click', function () {
-    Array.prototype.forEach.call(document.querySelectorAll('#tm-users .dr-pop'), function (x) { x.hidden = true; });
+    Array.prototype.forEach.call(document.querySelectorAll('#tm-dlg .dr-pop'), function (x) { x.hidden = true; });
   });
   function closeTeamDlg() { tmDlg.hidden = true; tmWork = null; }
+  // 担当フォルダの選び方（1行に収める: 選んだフォルダを要約したボタン。押すとチェックの一覧が開く）。holder.drives を書き換える
+  function tmDrivePicker(td, holder) {
+    var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'dr-btn';
+    var pop = document.createElement('div'); pop.className = 'dr-pop'; pop.hidden = true;
+    var shortName = function (n) { var k = n.lastIndexOf(' > '); return k > 0 ? n.slice(0, k) : n; };
+    var sum = function () {
+      var sel = tmWork.drives.filter(function (d) { return holder.drives.indexOf(d.id) >= 0; });
+      btn.textContent = !sel.length ? '未選択' : shortName(sel[0].name) + (sel.length > 1 ? ' ほか' + (sel.length - 1) + '件' : '');
+      btn.title = sel.map(function (d) { return d.name; }).join('\n') || '担当フォルダを選ぶ';
+      btn.classList.toggle('none', !sel.length);
+    };
+    tmWork.drives.forEach(function (d) {
+      var lb = document.createElement('label');
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = d.id; cb.checked = holder.drives.indexOf(d.id) >= 0;
+      cb.addEventListener('change', function () {
+        holder.drives = holder.drives.filter(function (x) { return x !== d.id; });
+        if (cb.checked) holder.drives.push(d.id);
+        sum();
+      });
+      lb.appendChild(cb); lb.appendChild(document.createTextNode(d.name));
+      pop.appendChild(lb);
+    });
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = pop.hidden;
+      Array.prototype.forEach.call(document.querySelectorAll('#tm-dlg .dr-pop'), function (x) { x.hidden = true; });
+      pop.hidden = !open;
+    });
+    pop.addEventListener('click', function (e) { e.stopPropagation(); });
+    sum();
+    td.innerHTML = '';
+    td.appendChild(btn); td.appendChild(pop);
+  }
+  // 追加欄: 役割がクライアントなら担当フォルダを選ぶ（ユーザー・マスターは「すべて」）
+  var tmNew = { drives: [] };
+  function tmRenderAddDrives() {
+    var td = document.getElementById('tm-add-drives');
+    if (!td || !tmWork) return;
+    td.innerHTML = '';
+    if (document.getElementById('tm-role').value !== 'client') { var al = document.createElement('span'); al.className = 'all'; al.textContent = 'すべて'; td.appendChild(al); return; }
+    if (!tmWork.drives.length) { var na = document.createElement('span'); na.className = 'all'; na.textContent = 'フォルダ未登録'; td.appendChild(na); return; }
+    tmNew.drives = tmNew.drives.filter(function (id) { return tmWork.drives.some(function (d) { return d.id === id; }); });
+    tmDrivePicker(td, tmNew);
+  }
   function tmRender() {
     var tb = document.getElementById('tm-users');
     tb.innerHTML = '';
@@ -4168,38 +4216,7 @@ function greet(name) {
       var tdD = document.createElement('td'); tdD.className = 'dr';
       if (u.role === 'client') {
         if (!tmWork.drives.length) { var na = document.createElement('span'); na.className = 'all'; na.textContent = 'フォルダ未登録'; tdD.appendChild(na); }
-        // 1行に収める: 選んだフォルダを要約したボタン。押すとチェックの一覧が開く
-        if (tmWork.drives.length) {
-          var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'dr-btn';
-          var pop = document.createElement('div'); pop.className = 'dr-pop'; pop.hidden = true;
-          var shortName = function (n) { var k = n.lastIndexOf(' > '); return k > 0 ? n.slice(0, k) : n; };
-          var sum = function () {
-            var sel = tmWork.drives.filter(function (d) { return u.drives.indexOf(d.id) >= 0; });
-            btn.textContent = !sel.length ? '未選択' : shortName(sel[0].name) + (sel.length > 1 ? ' ほか' + (sel.length - 1) + '件' : '');
-            btn.title = sel.map(function (d) { return d.name; }).join('\n') || '担当フォルダを選ぶ';
-            btn.classList.toggle('none', !sel.length);
-          };
-          tmWork.drives.forEach(function (d) {
-            var lb = document.createElement('label');
-            var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = d.id; cb.checked = u.drives.indexOf(d.id) >= 0;
-            cb.addEventListener('change', function () {
-              u.drives = u.drives.filter(function (x) { return x !== d.id; });
-              if (cb.checked) u.drives.push(d.id);
-              sum();
-            });
-            lb.appendChild(cb); lb.appendChild(document.createTextNode(d.name));
-            pop.appendChild(lb);
-          });
-          btn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            var open = pop.hidden;
-            Array.prototype.forEach.call(document.querySelectorAll('#tm-users .dr-pop'), function (x) { x.hidden = true; });
-            pop.hidden = !open;
-          });
-          pop.addEventListener('click', function (e) { e.stopPropagation(); });
-          sum();
-          tdD.appendChild(btn); tdD.appendChild(pop);
-        }
+        if (tmWork.drives.length) tmDrivePicker(tdD, u);
       } else {
         var al = document.createElement('span'); al.className = 'all'; al.textContent = 'すべて'; tdD.appendChild(al);
       }
@@ -4210,6 +4227,7 @@ function greet(name) {
       tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(tdD); tr.appendChild(td4);
       tb.appendChild(tr);
     });
+    tmRenderAddDrives();
     var ul = document.getElementById('tm-drives');
     ul.innerHTML = '';
     if (!tmWork.drives.length) {
@@ -4246,12 +4264,15 @@ function greet(name) {
     var r = document.getElementById('tm-role').value;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { document.getElementById('tm-state').textContent = 'メールアドレスの形式を確認してください'; return; }
     if (tmWork.users.some(function (u) { return u.email === email; })) { document.getElementById('tm-state').textContent = 'すでに登録されています: ' + email; return; }
-    tmWork.users.push({ email: email, name: name || email.split('@')[0], role: r, drives: r === 'client' ? tmWork.drives.map(function (d) { return d.id; }) : [] });
+    if (r === 'client' && tmWork.drives.length && !tmNew.drives.length) { document.getElementById('tm-state').textContent = 'クライアントの担当フォルダを選んでください'; return; }
+    tmWork.users.push({ email: email, name: name || email.split('@')[0], role: r, drives: r === 'client' ? tmNew.drives.slice() : [] });
+    tmNew.drives = [];
     document.getElementById('tm-email').value = '';
     document.getElementById('tm-name').value = '';
-    document.getElementById('tm-state').textContent = '';
+    document.getElementById('tm-state').textContent = '追加しました: ' + email + '（「保存」で確定）';
     tmRender();
   });
+  document.getElementById('tm-role').addEventListener('change', tmRenderAddDrives);
   document.getElementById('tm-email').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tm-add').click(); } });
   // 記事のフォルダの表示名: 「親フォルダ名 > フォルダ名」（同じ名前のフォルダをクライアントで見分ける。親の先頭の番号「01.」は省く）
   function driveFolderLabel(id) {
@@ -4308,6 +4329,11 @@ function greet(name) {
     if (!tmWork) return;
     var btn = this;
     var st = document.getElementById('tm-state');
+    // 追加欄に入力したまま「追加」を押していなければ、先に追加する（入力が消えないように）
+    if (document.getElementById('tm-email').value.trim()) {
+      document.getElementById('tm-add').click();
+      if (document.getElementById('tm-email').value.trim()) return;   // 追加できなかった（理由は状態欄に出る）
+    }
     var myMail = lib.user ? lowerMail(lib.user.emailAddress) : '';
     var hasMaster = teamMasters.length > 0 || tmWork.users.some(function (u) { return u.role === 'master'; });
     var meMaster = !myMail || teamMasters.indexOf(myMail) >= 0 || tmWork.users.some(function (u) { return u.email === myMail && u.role === 'master'; });
