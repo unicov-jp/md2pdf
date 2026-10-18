@@ -797,7 +797,7 @@
     <div class="dlg-bar"><strong>note に投稿</strong></div>
     <div class="dlg-body">
       <section class="st-sec">
-        <div class="st-head"><h3 id="np-file">（記事）</h3><a id="np-sheet-link" href="#" target="_blank" rel="noopener">予約表を開く</a></div>
+        <div class="st-head"><h3 id="np-file">（記事）</h3></div>
         <div id="np-row-state" class="np-row-state" hidden></div>
         <label class="st-field"><span>note アカウント</span><select id="np-acct"></select></label>
         <label class="st-field"><span>投稿方法</span><select id="np-type">
@@ -3258,7 +3258,7 @@ function greet(name) {
       if (!cfg || typeof cfg !== 'object') return;
       teamCfgLoaded = true;
       var merged = {};
-      ['clientId', 'apiKey', 'appId', 'scope', 'folderId', 'folderName', 'folderLink', 'gcpProject', 'noteSheetId', 'noteServiceAccount'].forEach(function (k) {
+      ['clientId', 'apiKey', 'appId', 'scope', 'folderId', 'folderName', 'folderLink', 'gcpProject', 'noteQueue', 'noteServiceAccount'].forEach(function (k) {
         if (cfg[k] !== undefined && cfg[k] !== null && cfg[k] !== '') merged[k] = String(cfg[k]);
       });
       Object.keys(driveCfg).forEach(function (k) { if (driveCfg[k] !== undefined && driveCfg[k] !== '') merged[k] = driveCfg[k]; });
@@ -3269,6 +3269,9 @@ function greet(name) {
         merged.folderId = String(cfg.folderId);
         merged.folderName = cfg.folderName ? String(cfg.folderName) : (merged.folderId === driveCfg.folderId ? merged.folderName : '');
       }
+      // note 投稿（予約キュー）は共通設定だけで決める
+      merged.noteQueue = cfg.noteQueue === true || cfg.noteQueue === 'true' ? 'true' : '';
+      merged.noteAccounts = Array.isArray(cfg.noteAccounts) ? cfg.noteAccounts.map(String).filter(Boolean) : [];
       driveCfg = merged;
       teamSetMasters(cfg.masters);   // 第5版: 初期マスター（あればチームモード）
       refreshFolderLabels();
@@ -4020,7 +4023,7 @@ function greet(name) {
     if (role === 'client' && mdPaneOpen()) setMdPane(false);
     rvRefresh();
     menuSync();   // 開くメニュー（クライアントは出さない）
-    document.getElementById('btn-note').hidden = !(role === 'master' && driveCfg.noteSheetId);   // note 投稿はマスターだけ
+    document.getElementById('btn-note').hidden = !(role === 'master' && driveCfg.noteQueue && driveCfg.folderId);   // note 投稿はマスターだけ
   }
   function clientMode() { return role === 'client'; }
   // クライアントは、ローカルのファイルを落として開くこともできない
@@ -4862,16 +4865,47 @@ function greet(name) {
   });
   pvEl.addEventListener('input', function () { if (role === 'master') rvRefresh(); });
 
-  /* ---------- note に投稿: 自動投稿ツールの「予約表」（スプレッドシート）にこの記事の行を書く。投稿はツールが行う ---------- */
+  /* ---------- note に投稿: 名簿と同じフォルダの md2pdf-note.json（予約キュー）にこの記事の行を書く。投稿は note 自動投稿ツールが行う ---------- */
+  // キューの形はスプレッドシートの予約表と同じ列（ツールは同じ処理で読む）。行の削除・並べ替えはしない
+  var NOTE_QUEUE_FILE = 'md2pdf-note.json';
+  var NOTE_HEADER = ['note ID', 'Post Date', 'Post Time', 'Title', 'Body', 'Thumbnail', 'Hashtag', 'Post Type', 'Enable / Disable', 'Result', 'Posted At', 'note URL', 'Message', 'Note Ref'];
   var npDlg = document.getElementById('np-dlg');
   var np = { row: 0, rows: [], file: null };
   function npSt(m) { document.getElementById('np-state').textContent = m || ''; }
-  function sheetsUrl(path) { return 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(driveCfg.noteSheetId) + path; }
-  function sheetsErr(e) {
-    var m = (e && e.message) || String(e);
-    if (/SERVICE_DISABLED|has not been used|is disabled/i.test(m)) return 'Google Cloud で「Google Sheets API」を有効にしてください（プロジェクト ' + (driveCfg.gcpProject || '') + '）';
-    if (/ 403 /.test(m)) return '予約表を編集する権限がありません（予約表の共有を確認してください）';
-    return m;
+  function npNewQueue() {
+    var accts = (driveCfg.noteAccounts && driveCfg.noteAccounts.length ? driveCfg.noteAccounts : []).map(function (a) {
+      return [a, 'NOTE_COOKIE_' + String(a).toUpperCase().replace(/[^A-Z0-9]/g, '_'), '', '', ''];
+    });
+    return {
+      version: 1, timeZone: 'Asia/Tokyo',
+      sheets: {
+        '予約表': [NOTE_HEADER.slice()],
+        'アカウント': [['note ID', 'Secret 名', '状態', '最終確認', '担当・メモ']].concat(accts),
+        '設定': [['項目', '値', '説明'], ['実行間隔', '1時間', ''], ['目次', '自動（見出しが3つ以上）', ''], ['表', '画像にする', ''], ['最終確認', '', ''], ['次回確認の目安', '', ''], ['前回の結果', '', '']]
+      }
+    };
+  }
+  // キューを読む（無ければ新しい形を返す。id は空）
+  function npQueueLoad() {
+    return driveFindInFolder(NOTE_QUEUE_FILE, driveCfg.folderId).then(function (id) {
+      if (!id) return { id: '', data: npNewQueue() };
+      return driveDownload(id).then(function (b) { return b.text(); }).then(function (t) {
+        var data;
+        try { data = JSON.parse(String(t).replace(/^﻿/, '')); } catch (e) { throw new Error(NOTE_QUEUE_FILE + ' を読めません（JSON の形が壊れています）'); }
+        if (!data || !data.sheets || !Array.isArray(data.sheets['予約表'])) throw new Error(NOTE_QUEUE_FILE + ' の形が正しくありません');
+        return { id: id, data: data };
+      });
+    });
+  }
+  // 書く直前に読み直し、mutate で変えてから保存する（ツールが結果を書いた直後でも消さない）
+  function npQueueSave(mutate) {
+    return npQueueLoad().then(function (q) {
+      mutate(q.data);
+      q.data.updatedAt = new Date().toISOString();
+      q.data.updatedBy = myName();
+      return driveUpload(NOTE_QUEUE_FILE, new Blob([JSON.stringify(q.data, null, 2) + '\n'], { type: 'application/json' }), 'application/json', driveCfg.folderId)
+        .then(function (j) { return (j && j.id) || q.id; });
+    });
   }
   function npFileUrl(id) { return 'https://drive.google.com/file/d/' + id + '/view'; }
   function npFileIdOf(url) { var m = /\/file\/d\/([\w-]+)/.exec(url || '') || /[?&]id=([\w-]+)/.exec(url || ''); return m ? m[1] : ''; }
@@ -4882,30 +4916,34 @@ function greet(name) {
   }
   function npSyncWhen() { document.getElementById('np-when').hidden = document.getElementById('np-type').value !== '予約投稿'; }
   function openNotePost() {
-    if (role !== 'master' || !driveCfg.noteSheetId) return;
+    if (role !== 'master' || !driveCfg.noteQueue) return;
     if (!lib.current) { setStatus('note に投稿するには、左の一覧から記事を開いてください'); return; }
     flushAll();
     np.file = lib.current;
     document.getElementById('np-file').textContent = fileTitle(np.file.name);
-    document.getElementById('np-sheet-link').href = 'https://docs.google.com/spreadsheets/d/' + driveCfg.noteSheetId + '/edit';
     var rs = document.getElementById('np-row-state'); rs.hidden = true; rs.innerHTML = '';
     document.getElementById('np-go').disabled = true;
-    npSt('予約表を読み込み中...');
+    npSt('予約を読み込み中...');
     npDlg.hidden = false;
-    var ranges = ["'予約表'!A2:N", "'アカウント'!A2:A"].map(function (r) { return 'ranges=' + encodeURIComponent(r); }).join('&');
-    driveFetch(sheetsUrl('/values:batchGet?' + ranges)).then(function (r) { return r.json(); }).then(function (j) {
-      var vr = j.valueRanges || [];
-      var rows = (vr[0] && vr[0].values) || [];
-      var accts = ((vr[1] && vr[1].values) || []).map(function (x) { return x[0]; }).filter(Boolean);
+    npQueueLoad().then(function (q) {
+      var rows = q.data.sheets['予約表'].slice(1);
+      var acctRows = (q.data.sheets['アカウント'] || []).slice(1);
+      var accts = acctRows.map(function (x) { return String(x[0] || ''); }).filter(Boolean);
+      (driveCfg.noteAccounts || []).forEach(function (a) { if (accts.indexOf(a) < 0) accts.push(a); });
       np.rows = rows;
       np.row = 0;
-      rows.forEach(function (r, i) { if (npFileIdOf(r[4]) === np.file.id) np.row = i + 2; });   // 2行目から
+      rows.forEach(function (r, i) { if (npFileIdOf(r[4]) === np.file.id) np.row = i + 2; });   // 見出しが1行目
       var cur = np.row ? rows[np.row - 2] : [];
       var last = '';
       try { last = localStorage.getItem('md2pdf-note-acct') || ''; } catch (e) { /* ignore */ }
       var acct = cur[0] || (accts.indexOf(last) >= 0 ? last : accts[0] || '');
       var sel = document.getElementById('np-acct'); sel.innerHTML = '';
-      accts.forEach(function (a) { var o = document.createElement('option'); o.value = a; o.textContent = a; sel.appendChild(o); });
+      accts.forEach(function (a) {
+        var o = document.createElement('option'); o.value = a;
+        var st = (acctRows.filter(function (x) { return x[0] === a; })[0] || [])[2];
+        o.textContent = a + (st ? '（' + st + '）' : '');
+        sel.appendChild(o);
+      });
       sel.value = acct;
       // ハッシュタグは、この記事の行が無ければ同じアカウントの最後の行から引き継ぐ
       var sameAcct = rows.filter(function (r) { return r[0] === acct && r[6]; });
@@ -4920,20 +4958,21 @@ function greet(name) {
       document.getElementById('np-thumb').value = cur[5] || '';
       document.getElementById('np-tags').value = (tags || '').replace(/\n+$/, '');
       if (np.row) {
-        var parts = ['予約表の ' + np.row + ' 行目に登録済み'];
-        if (cur[9]) parts.push('結果: ' + ({ Posted: '投稿済み', Scheduled: '予約済み', Drafted: '下書き保存済み', Error: 'エラー' }[cur[9]] || cur[9]));
+        var parts = ['登録済み'];
+        if (cur[8] === 'Disable') parts.push('（停止中）');
+        if (cur[9]) parts.push('結果: ' + ({ Posted: '投稿済み', Scheduled: '予約済み', Drafted: '下書き保存済み', Error: 'エラー', Missed: '見送り', Deleted: '削除済み' }[cur[9]] || cur[9]));
         if (cur[10]) parts.push('投稿: ' + cur[10]);
         rs.textContent = parts.join('　');
         if (cur[12]) { rs.appendChild(document.createElement('br')); rs.appendChild(document.createTextNode(cur[12])); }
         if (cur[11]) { rs.appendChild(document.createElement('br')); var a = document.createElement('a'); a.href = cur[11]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = cur[11]; rs.appendChild(a); }
         rs.hidden = false;
       }
-      document.getElementById('np-go').textContent = np.row ? '予約表を更新' : '予約表に登録';
-      if (!accts.length) { npSt('「アカウント」シートに note ID がありません'); return; }
+      document.getElementById('np-go').textContent = np.row ? '予約を更新' : '予約に登録';
+      if (!accts.length) { npSt('note アカウントがありません（共通設定の noteAccounts に note ID を入れてください）'); return; }
       npSyncWhen();
       document.getElementById('np-go').disabled = false;
       npSt('');
-    }).catch(function (e) { npSt('予約表を読めませんでした: ' + sheetsErr(e)); });
+    }).catch(function (e) { npSt('予約を読めませんでした: ' + ((e && e.message) || e)); });
   }
   function closeNotePost() { npDlg.hidden = true; }
   function doNotePost() {
@@ -4949,42 +4988,54 @@ function greet(name) {
     go.disabled = true;
     var file = np.file;
     var tags = document.getElementById('np-tags').value.split(/\n+/).map(function (t) { t = t.trim(); return t && t.charAt(0) !== '#' ? '#' + t : t; }).filter(Boolean).join('\n');
-    var row = [acct, type === '予約投稿' ? date.replace(/-/g, '/') : '', type === '予約投稿' ? time : '', title, npFileUrl(file.id),
+    var input = [acct, type === '予約投稿' ? date.replace(/-/g, '/') : '', type === '予約投稿' ? time : '', title, npFileUrl(file.id),
       document.getElementById('np-thumb').value.trim(), tags, type, 'Enable'];
+    var warn = [];
     // 1. 変更があれば先に保存（投稿ツールは Drive のファイルを読む）
     var saved = (lib.current && lib.current.id === file.id && isDirty()) ? (npSt('記事を保存中...'), libUpdate()) : Promise.resolve();
     saved.then(function () {
-      // 2. 投稿ツールのサービスアカウントが記事を読めるように共有（失敗しても登録は続ける）
-      if (!driveCfg.noteServiceAccount) return '';
-      npSt('投稿ツールに記事を共有中...');
-      return driveShareQuiet(file.id, driveCfg.noteServiceAccount).then(function () { return ''; }, function (e) { return '（記事をサービスアカウントに共有できませんでした: ' + ((e && e.message) || e) + '）'; });
-    }).then(function (shareWarn) {
-      npSt('予約表に書き込み中...');
-      var req = np.row
-        ? driveFetch(sheetsUrl('/values/' + encodeURIComponent("'予約表'!A" + np.row + ':I' + np.row) + '?valueInputOption=USER_ENTERED'),
-            { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [row] }) })
-        : driveFetch(sheetsUrl('/values/' + encodeURIComponent("'予約表'!A:N") + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS'),
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [row] }) });
-      return req.then(function (r) { return r.json(); }).then(function () {
-        try { localStorage.setItem('md2pdf-note-acct', acct); } catch (e) { /* ignore */ }
-        // 3. 記事のステータスを「投稿待ち」に（下書き保存のときは変えない）
-        if (type !== '下書き保存' && file.status !== 'posted') {
-          driveSetStatus(file.id, 'ready').then(function () {
-            lib.files.forEach(function (f) { if (f.id === file.id) f.status = 'ready'; });
-            if (lib.current && lib.current.id === file.id) lib.current.status = 'ready';
-            libRenderList();
-          }).catch(function () { /* ignore */ });
+      // 2. 予約キューに書く（この記事の行があれば入力の列だけ書き換え、無ければ末尾に追加）
+      npSt('予約を書き込み中...');
+      var rowNo = 0;
+      return npQueueSave(function (data) {
+        var grid = data.sheets['予約表'];
+        rowNo = 0;
+        grid.forEach(function (r, i) { if (i > 0 && npFileIdOf(r[4]) === file.id) rowNo = i + 1; });
+        if (rowNo) {
+          var r = grid[rowNo - 1];
+          for (var k = 0; k < input.length; k++) r[k] = input[k];
+        } else {
+          grid.push(input.concat(['', '', '', '', '']));
+          rowNo = grid.length;
         }
-        var what = type === '予約投稿' ? date.replace(/-/g, '/') + ' ' + time + ' に予約投稿' : type === '通常投稿' ? '次の確認のタイミングで投稿' : type === '下書き保存' ? '下書き保存' : '投稿済みの記事を上書き';
-        setStatus('予約表に' + (np.row ? '更新' : '登録') + 'しました: ' + title + '（' + what + '）' + shareWarn);
-        closeNotePost();
+      }).then(function (queueId) {
+        // 3. 投稿ツールのサービスアカウントに共有（記事は閲覧者、キューは編集者）。失敗しても予約は残す
+        if (!driveCfg.noteServiceAccount) return;
+        npSt('投稿ツールに共有中...');
+        return Promise.all([
+          driveShareQuiet(file.id, driveCfg.noteServiceAccount, 'reader').catch(function (e) { warn.push('記事の共有に失敗: ' + ((e && e.message) || e)); }),
+          queueId ? driveShareQuiet(queueId, driveCfg.noteServiceAccount, 'writer').catch(function (e) { warn.push('予約キューの共有に失敗: ' + ((e && e.message) || e)); }) : null
+        ]);
       });
-    }).catch(function (e) { npSt('登録できませんでした: ' + sheetsErr(e)); }).then(function () { go.disabled = false; });
+    }).then(function () {
+      try { localStorage.setItem('md2pdf-note-acct', acct); } catch (e) { /* ignore */ }
+      // 4. 記事のステータスを「投稿待ち」に（下書き保存のときは変えない）
+      if (type !== '下書き保存' && file.status !== 'posted') {
+        driveSetStatus(file.id, 'ready').then(function () {
+          lib.files.forEach(function (f) { if (f.id === file.id) f.status = 'ready'; });
+          if (lib.current && lib.current.id === file.id) lib.current.status = 'ready';
+          libRenderList();
+        }).catch(function () { /* ignore */ });
+      }
+      var what = type === '予約投稿' ? date.replace(/-/g, '/') + ' ' + time + ' に予約投稿' : type === '通常投稿' ? '次の確認のタイミングで投稿' : type === '下書き保存' ? '下書き保存' : '投稿済みの記事を上書き';
+      setStatus('note の予約に' + (np.row ? '更新' : '登録') + 'しました: ' + title + '（' + what + '）' + (warn.length ? '　' + warn.join(' / ') : ''));
+      closeNotePost();
+    }).catch(function (e) { npSt('登録できませんでした: ' + ((e && e.message) || e)); }).then(function () { go.disabled = false; });
   }
   // 共有（通知メールは送らない。すでに共有済みでもエラーにしない）
-  function driveShareQuiet(fileId, email) {
+  function driveShareQuiet(fileId, email, driveRole) {
     return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '/permissions?supportsAllDrives=true&sendNotificationEmail=false&fields=id',
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'reader', type: 'user', emailAddress: email }) });
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: driveRole || 'reader', type: 'user', emailAddress: email }) });
   }
   document.getElementById('btn-note').addEventListener('click', openNotePost);
   document.getElementById('np-close').addEventListener('click', closeNotePost);

@@ -6,5 +6,11 @@
   "masters": [
     "minatani@e-com01.co.jp"
   ],
-  "gcpProject": "ecom-md2pdf"
+  "gcpProject": "ecom-md2pdf",
+  "noteQueue": true,
+  "noteServiceAccount": "note-auto-poster@note-auto-posting-tool.iam.gserviceaccount.com",
+  "noteAccounts": [
+    "nakagin_lifecare",
+    "unicovailab"
+  ]
 }
