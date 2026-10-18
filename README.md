@@ -109,3 +109,17 @@ flowchart LR
 - Google Identity Services／Google Picker：Google Drive に接続したときのみ読み込み
 
 - 記事ごとのサブフォルダ（1階層）の .md も一覧に出します（images・99.・_ で始まるフォルダは除外）。日付は _yyyymmdd / _yyyymmddHHMMSS に対応。
+
+## 版と戻し方（ロールバック）
+
+| 版 | 内容 | 目印（GitHub のブランチ） |
+| --- | --- | --- |
+| 第6版 v6.0（2026-10-18 運用版） | 記事フォルダ・設定の簡素化・保存は1ファイル上書き・戻る/進む・ステータス・クライアント制限・ユーザー追加の修正 | release/v6.0 |
+| 第5版 v5 | 役割・名簿・提案モード | release/v5 |
+| 第4版 v4 | 画面で編集 | release/v4 |
+| 第3版 v3 | Google Drive ポータル | release/v3 |
+
+- 第6版はサイトの中にも控えがあります: https://unicov-jp.github.io/md2pdf/versions/v6.0/ （そのまま開いて使えます）
+- 公開版をある版に戻すには、その版の `index.html` と `md2pdf-config.json` を最上位に上書きして main に反映します。
+  例: `git checkout release/v6.0 -- index.html md2pdf-config.json && git commit -m "v6.0 に戻す" && git push origin main`
+- 新しい版を出すときは、`versions/vX.Y/` に控えを作り、`release/vX.Y` のブランチを作ってこの表に1行足します。
