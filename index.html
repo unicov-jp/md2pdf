@@ -54,6 +54,16 @@
   header.toolbar #status { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
   header.toolbar .spacer { flex: 0 0 0; }
   #ed-insert { width: 8em; }
+  /* note に投稿 */
+  #np-dlg .st-field select, #np-dlg .st-field input, #np-dlg .st-field textarea { width: 100%; font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--editor-bg); color: var(--text); }
+  #np-dlg .np-when .st-line { gap: 8px; flex-wrap: nowrap; }
+  #np-dlg .np-when input { width: auto; }
+  #np-dlg .np-tags { align-items: start; }
+  #np-dlg .np-when[hidden] { display: none; }
+  .np-row-state { font-size: 12px; padding: 8px 10px; border-radius: 6px; background: var(--bg); line-height: 1.6; }
+  .np-row-state[hidden] { display: none; }
+  .np-row-state a { color: var(--accent); }
+  #btn-note[hidden] { display: none; }
   /* Google Drive から開く */
   #od-q { width: 100%; }
   .od-list { list-style: none; margin: 0; padding: 0; max-height: 55vh; overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
@@ -502,6 +512,7 @@
   <span class="spacer"></span>
   <span id="status">準備中...</span>
   <span id="role-badge" class="role-badge" hidden></span>
+  <button type="button" id="btn-note" hidden title="この記事を note の予約表に登録する（マスターのみ）">note投稿</button>
   <button type="button" id="btn-users" title="設定: Google Drive の接続・フォルダ（URL）・取り込み、ユーザーの登録と権限">設定</button>
   <button type="button" id="btn-drive-settings" hidden title="Google Drive の接続設定">Drive設定</button>
   <button type="button" id="btn-print" title="ブラウザの印刷から「PDFに保存」（文字を選択できるPDF）">PDF出力（印刷）</button>
@@ -776,6 +787,31 @@
       <input type="text" id="od-q" class="wide" placeholder="ファイル名で検索" spellcheck="false" autocomplete="off">
       <ul id="od-list" class="od-list"></ul>
       <div class="st-foot"><span id="od-state" class="muted"></span><span class="spacer"></span><button type="button" id="od-close">閉じる</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- note に投稿（予約表に登録） -->
+<div id="np-dlg" class="dlg no-print" hidden>
+  <div class="dlg-panel narrow st" role="dialog" aria-label="note に投稿">
+    <div class="dlg-bar"><strong>note に投稿</strong></div>
+    <div class="dlg-body">
+      <section class="st-sec">
+        <div class="st-head"><h3 id="np-file">（記事）</h3><a id="np-sheet-link" href="#" target="_blank" rel="noopener">予約表を開く</a></div>
+        <div id="np-row-state" class="np-row-state" hidden></div>
+        <label class="st-field"><span>note アカウント</span><select id="np-acct"></select></label>
+        <label class="st-field"><span>投稿方法</span><select id="np-type">
+          <option value="予約投稿">予約投稿</option>
+          <option value="通常投稿">すぐに投稿（通常投稿）</option>
+          <option value="下書き保存">下書き保存</option>
+          <option value="上書き保存">投稿済みの記事を上書き</option>
+        </select></label>
+        <div class="st-field np-when" id="np-when"><span>投稿日時</span><span class="st-line"><input type="date" id="np-date"><input type="time" id="np-time" step="300"></span></div>
+        <label class="st-field"><span>タイトル</span><input type="text" id="np-title" spellcheck="false"></label>
+        <label class="st-field"><span>サムネイル</span><input type="text" id="np-thumb" placeholder="画像の URL（任意）" spellcheck="false"></label>
+        <label class="st-field np-tags"><span>ハッシュタグ</span><textarea id="np-tags" rows="4" placeholder="#タグ（1行に1つ）" spellcheck="false"></textarea></label>
+      </section>
+      <div class="st-foot"><span id="np-state" class="muted"></span><span class="spacer"></span><button type="button" id="np-close">閉じる</button><button type="button" id="np-go" class="primary">予約表に登録</button></div>
     </div>
   </div>
 </div>
@@ -2521,6 +2557,7 @@ function greet(name) {
     var closed = false;
     if (!atomDlg.hidden) { closeAtomDlg(); closed = true; }
     else if (!tmDlg.hidden) { closeTeamDlg(); closed = true; }
+    else if (!npDlg.hidden) { closeNotePost(); closed = true; }
     else if (!imgDlg.hidden) { closeImgDlg(); closed = true; }
     else if (!gdDlg.hidden) { closeDriveSettings(); closed = true; }
     else if (!saveDlg.hidden) { closeSaveDlg(); closed = true; }
@@ -3221,7 +3258,7 @@ function greet(name) {
       if (!cfg || typeof cfg !== 'object') return;
       teamCfgLoaded = true;
       var merged = {};
-      ['clientId', 'apiKey', 'appId', 'scope', 'folderId', 'folderName', 'folderLink', 'gcpProject'].forEach(function (k) {
+      ['clientId', 'apiKey', 'appId', 'scope', 'folderId', 'folderName', 'folderLink', 'gcpProject', 'noteSheetId', 'noteServiceAccount'].forEach(function (k) {
         if (cfg[k] !== undefined && cfg[k] !== null && cfg[k] !== '') merged[k] = String(cfg[k]);
       });
       Object.keys(driveCfg).forEach(function (k) { if (driveCfg[k] !== undefined && driveCfg[k] !== '') merged[k] = driveCfg[k]; });
@@ -3983,6 +4020,7 @@ function greet(name) {
     if (role === 'client' && mdPaneOpen()) setMdPane(false);
     rvRefresh();
     menuSync();   // 開くメニュー（クライアントは出さない）
+    document.getElementById('btn-note').hidden = !(role === 'master' && driveCfg.noteSheetId);   // note 投稿はマスターだけ
   }
   function clientMode() { return role === 'client'; }
   // クライアントは、ローカルのファイルを落として開くこともできない
@@ -4823,6 +4861,136 @@ function greet(name) {
     setStatus('すべて却下しました');
   });
   pvEl.addEventListener('input', function () { if (role === 'master') rvRefresh(); });
+
+  /* ---------- note に投稿: 自動投稿ツールの「予約表」（スプレッドシート）にこの記事の行を書く。投稿はツールが行う ---------- */
+  var npDlg = document.getElementById('np-dlg');
+  var np = { row: 0, rows: [], file: null };
+  function npSt(m) { document.getElementById('np-state').textContent = m || ''; }
+  function sheetsUrl(path) { return 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(driveCfg.noteSheetId) + path; }
+  function sheetsErr(e) {
+    var m = (e && e.message) || String(e);
+    if (/SERVICE_DISABLED|has not been used|is disabled/i.test(m)) return 'Google Cloud で「Google Sheets API」を有効にしてください（プロジェクト ' + (driveCfg.gcpProject || '') + '）';
+    if (/ 403 /.test(m)) return '予約表を編集する権限がありません（予約表の共有を確認してください）';
+    return m;
+  }
+  function npFileUrl(id) { return 'https://drive.google.com/file/d/' + id + '/view'; }
+  function npFileIdOf(url) { var m = /\/file\/d\/([\w-]+)/.exec(url || '') || /[?&]id=([\w-]+)/.exec(url || ''); return m ? m[1] : ''; }
+  function npPad(n) { return (n < 10 ? '0' : '') + n; }
+  function npTitleOf(md, name) {
+    var m = /^#\s+(.+?)\s*#*\s*$/m.exec(md || '');
+    return m ? m[1].replace(/\*\*/g, '').trim() : fileTitle(name || '');
+  }
+  function npSyncWhen() { document.getElementById('np-when').hidden = document.getElementById('np-type').value !== '予約投稿'; }
+  function openNotePost() {
+    if (role !== 'master' || !driveCfg.noteSheetId) return;
+    if (!lib.current) { setStatus('note に投稿するには、左の一覧から記事を開いてください'); return; }
+    flushAll();
+    np.file = lib.current;
+    document.getElementById('np-file').textContent = fileTitle(np.file.name);
+    document.getElementById('np-sheet-link').href = 'https://docs.google.com/spreadsheets/d/' + driveCfg.noteSheetId + '/edit';
+    var rs = document.getElementById('np-row-state'); rs.hidden = true; rs.innerHTML = '';
+    document.getElementById('np-go').disabled = true;
+    npSt('予約表を読み込み中...');
+    npDlg.hidden = false;
+    var ranges = ["'予約表'!A2:N", "'アカウント'!A2:A"].map(function (r) { return 'ranges=' + encodeURIComponent(r); }).join('&');
+    driveFetch(sheetsUrl('/values:batchGet?' + ranges)).then(function (r) { return r.json(); }).then(function (j) {
+      var vr = j.valueRanges || [];
+      var rows = (vr[0] && vr[0].values) || [];
+      var accts = ((vr[1] && vr[1].values) || []).map(function (x) { return x[0]; }).filter(Boolean);
+      np.rows = rows;
+      np.row = 0;
+      rows.forEach(function (r, i) { if (npFileIdOf(r[4]) === np.file.id) np.row = i + 2; });   // 2行目から
+      var cur = np.row ? rows[np.row - 2] : [];
+      var last = '';
+      try { last = localStorage.getItem('md2pdf-note-acct') || ''; } catch (e) { /* ignore */ }
+      var acct = cur[0] || (accts.indexOf(last) >= 0 ? last : accts[0] || '');
+      var sel = document.getElementById('np-acct'); sel.innerHTML = '';
+      accts.forEach(function (a) { var o = document.createElement('option'); o.value = a; o.textContent = a; sel.appendChild(o); });
+      sel.value = acct;
+      // ハッシュタグは、この記事の行が無ければ同じアカウントの最後の行から引き継ぐ
+      var sameAcct = rows.filter(function (r) { return r[0] === acct && r[6]; });
+      var tags = cur[6] || (sameAcct.length ? sameAcct[sameAcct.length - 1][6] : '');
+      var tm = new Date(Date.now() + 24 * 3600 * 1000);
+      var d = /(\d{4})\/(\d{1,2})\/(\d{1,2})/.exec(cur[1] || '');
+      document.getElementById('np-date').value = d ? d[1] + '-' + npPad(+d[2]) + '-' + npPad(+d[3]) : tm.getFullYear() + '-' + npPad(tm.getMonth() + 1) + '-' + npPad(tm.getDate());
+      document.getElementById('np-time').value = /^\d{1,2}:\d{2}$/.test(cur[2] || '') ? npPad(+cur[2].split(':')[0]) + ':' + cur[2].split(':')[1] : '18:00';
+      var posted = cur[9] === 'Posted' || cur[7] === '投稿済み';
+      document.getElementById('np-type').value = posted ? '上書き保存' : (['予約投稿', '通常投稿', '下書き保存', '上書き保存'].indexOf(cur[7]) >= 0 ? cur[7] : '予約投稿');
+      document.getElementById('np-title').value = cur[3] || npTitleOf(mdEl.value, np.file.name);
+      document.getElementById('np-thumb').value = cur[5] || '';
+      document.getElementById('np-tags').value = (tags || '').replace(/\n+$/, '');
+      if (np.row) {
+        var parts = ['予約表の ' + np.row + ' 行目に登録済み'];
+        if (cur[9]) parts.push('結果: ' + ({ Posted: '投稿済み', Scheduled: '予約済み', Drafted: '下書き保存済み', Error: 'エラー' }[cur[9]] || cur[9]));
+        if (cur[10]) parts.push('投稿: ' + cur[10]);
+        rs.textContent = parts.join('　');
+        if (cur[12]) { rs.appendChild(document.createElement('br')); rs.appendChild(document.createTextNode(cur[12])); }
+        if (cur[11]) { rs.appendChild(document.createElement('br')); var a = document.createElement('a'); a.href = cur[11]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = cur[11]; rs.appendChild(a); }
+        rs.hidden = false;
+      }
+      document.getElementById('np-go').textContent = np.row ? '予約表を更新' : '予約表に登録';
+      if (!accts.length) { npSt('「アカウント」シートに note ID がありません'); return; }
+      npSyncWhen();
+      document.getElementById('np-go').disabled = false;
+      npSt('');
+    }).catch(function (e) { npSt('予約表を読めませんでした: ' + sheetsErr(e)); });
+  }
+  function closeNotePost() { npDlg.hidden = true; }
+  function doNotePost() {
+    var acct = document.getElementById('np-acct').value;
+    var type = document.getElementById('np-type').value;
+    var title = document.getElementById('np-title').value.trim();
+    var date = document.getElementById('np-date').value, time = document.getElementById('np-time').value;
+    if (!acct) { npSt('note アカウントを選んでください'); return; }
+    if (!title) { npSt('タイトルを入れてください'); return; }
+    if (type === '予約投稿' && (!date || !time)) { npSt('投稿日時を入れてください'); return; }
+    if (type === '予約投稿' && new Date(date + 'T' + time + ':00') < new Date()) { npSt('投稿日時が過ぎています'); return; }
+    var go = document.getElementById('np-go');
+    go.disabled = true;
+    var file = np.file;
+    var tags = document.getElementById('np-tags').value.split(/\n+/).map(function (t) { t = t.trim(); return t && t.charAt(0) !== '#' ? '#' + t : t; }).filter(Boolean).join('\n');
+    var row = [acct, type === '予約投稿' ? date.replace(/-/g, '/') : '', type === '予約投稿' ? time : '', title, npFileUrl(file.id),
+      document.getElementById('np-thumb').value.trim(), tags, type, 'Enable'];
+    // 1. 変更があれば先に保存（投稿ツールは Drive のファイルを読む）
+    var saved = (lib.current && lib.current.id === file.id && isDirty()) ? (npSt('記事を保存中...'), libUpdate()) : Promise.resolve();
+    saved.then(function () {
+      // 2. 投稿ツールのサービスアカウントが記事を読めるように共有（失敗しても登録は続ける）
+      if (!driveCfg.noteServiceAccount) return '';
+      npSt('投稿ツールに記事を共有中...');
+      return driveShareQuiet(file.id, driveCfg.noteServiceAccount).then(function () { return ''; }, function (e) { return '（記事をサービスアカウントに共有できませんでした: ' + ((e && e.message) || e) + '）'; });
+    }).then(function (shareWarn) {
+      npSt('予約表に書き込み中...');
+      var req = np.row
+        ? driveFetch(sheetsUrl('/values/' + encodeURIComponent("'予約表'!A" + np.row + ':I' + np.row) + '?valueInputOption=USER_ENTERED'),
+            { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [row] }) })
+        : driveFetch(sheetsUrl('/values/' + encodeURIComponent("'予約表'!A:N") + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS'),
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [row] }) });
+      return req.then(function (r) { return r.json(); }).then(function () {
+        try { localStorage.setItem('md2pdf-note-acct', acct); } catch (e) { /* ignore */ }
+        // 3. 記事のステータスを「投稿待ち」に（下書き保存のときは変えない）
+        if (type !== '下書き保存' && file.status !== 'posted') {
+          driveSetStatus(file.id, 'ready').then(function () {
+            lib.files.forEach(function (f) { if (f.id === file.id) f.status = 'ready'; });
+            if (lib.current && lib.current.id === file.id) lib.current.status = 'ready';
+            libRenderList();
+          }).catch(function () { /* ignore */ });
+        }
+        var what = type === '予約投稿' ? date.replace(/-/g, '/') + ' ' + time + ' に予約投稿' : type === '通常投稿' ? '次の確認のタイミングで投稿' : type === '下書き保存' ? '下書き保存' : '投稿済みの記事を上書き';
+        setStatus('予約表に' + (np.row ? '更新' : '登録') + 'しました: ' + title + '（' + what + '）' + shareWarn);
+        closeNotePost();
+      });
+    }).catch(function (e) { npSt('登録できませんでした: ' + sheetsErr(e)); }).then(function () { go.disabled = false; });
+  }
+  // 共有（通知メールは送らない。すでに共有済みでもエラーにしない）
+  function driveShareQuiet(fileId, email) {
+    return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '/permissions?supportsAllDrives=true&sendNotificationEmail=false&fields=id',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'reader', type: 'user', emailAddress: email }) });
+  }
+  document.getElementById('btn-note').addEventListener('click', openNotePost);
+  document.getElementById('np-close').addEventListener('click', closeNotePost);
+  document.getElementById('np-go').addEventListener('click', doNotePost);
+  document.getElementById('np-type').addEventListener('change', npSyncWhen);
+  npDlg.addEventListener('click', function (e) { if (e.target === npDlg) closeNotePost(); });
 
   /* ---------- shortcuts ---------- */
   window.addEventListener('keydown', function (e) {

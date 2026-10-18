@@ -114,12 +114,19 @@ flowchart LR
 
 | 版 | 内容 | 目印（GitHub のブランチ） |
 | --- | --- | --- |
+| 第6版 v6.1（2026-10-18） | note 投稿（マスターのみ。自動投稿ツールの予約表に記事を登録） | release/v6.1 |
 | 第6版 v6.0（2026-10-18 運用版） | 記事フォルダ・設定の簡素化・保存は1ファイル上書き・戻る/進む・ステータス・クライアント制限・ユーザー追加の修正 | release/v6.0 |
 | 第5版 v5 | 役割・名簿・提案モード | release/v5 |
 | 第4版 v4 | 画面で編集 | release/v4 |
 | 第3版 v3 | Google Drive ポータル | release/v3 |
 
-- 第6版はサイトの中にも控えがあります: https://unicov-jp.github.io/md2pdf/versions/v6.0/ （そのまま開いて使えます）
+- 第6版以降はサイトの中にも控えがあります: https://unicov-jp.github.io/md2pdf/versions/v6.1/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.0/ （そのまま開いて使えます）
 - 公開版をある版に戻すには、その版の `index.html` と `md2pdf-config.json` を最上位に上書きして main に反映します。
   例: `git checkout release/v6.0 -- index.html md2pdf-config.json && git commit -m "v6.0 に戻す" && git push origin main`
 - 新しい版を出すときは、`versions/vX.Y/` に控えを作り、`release/vX.Y` のブランチを作ってこの表に1行足します。
+
+## note 投稿（第6版 v6.1・マスターのみ）
+
+- 記事を開いて「note投稿」を押すと、note 自動投稿ツールの予約表（md2pdf-config.json の noteSheetId）に、その記事の行を登録・更新します。投稿そのものは自動投稿ツールが予約表を確認したときに行います。
+- 本文（Body）にはこの記事の Drive の URL が入ります。投稿ツールが読めるように、記事をサービスアカウント（noteServiceAccount）に閲覧者として共有します。
+- 前提: Google Cloud（ecom-md2pdf）で Google Sheets API が有効であること、予約表をマスターが編集できること。
