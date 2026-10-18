@@ -114,6 +114,7 @@ flowchart LR
 
 | 版 | 内容 | 目印（GitHub のブランチ） |
 | --- | --- | --- |
+| 第6版 v6.3（2026-10-18） | 設定の「記事のフォルダ」から note アカウントを追加・外す・フォルダごとに指定 | release/v6.3 |
 | 第6版 v6.2（2026-10-18） | note 投稿をドライブの予約キュー（md2pdf-note.json）に変更。スプレッドシートと連動しない | release/v6.2 |
 | 第6版 v6.1（2026-10-18） | note 投稿（マスターのみ。自動投稿ツールの予約表に記事を登録） | release/v6.1 |
 | 第6版 v6.0（2026-10-18 運用版） | 記事フォルダ・設定の簡素化・保存は1ファイル上書き・戻る/進む・ステータス・クライアント制限・ユーザー追加の修正 | release/v6.0 |
@@ -121,15 +122,17 @@ flowchart LR
 | 第4版 v4 | 画面で編集 | release/v4 |
 | 第3版 v3 | Google Drive ポータル | release/v3 |
 
-- 第6版以降はサイトの中にも控えがあります: https://unicov-jp.github.io/md2pdf/versions/v6.2/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.1/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.0/ （そのまま開いて使えます）
+- 第6版以降はサイトの中にも控えがあります: https://unicov-jp.github.io/md2pdf/versions/v6.3/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.2/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.1/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.0/ （そのまま開いて使えます）
 - 公開版をある版に戻すには、その版の `index.html` と `md2pdf-config.json` を最上位に上書きして main に反映します。
   例: `git checkout release/v6.0 -- index.html md2pdf-config.json && git commit -m "v6.0 に戻す" && git push origin main`
 - 新しい版を出すときは、`versions/vX.Y/` に控えを作り、`release/vX.Y` のブランチを作ってこの表に1行足します。
 
-## note 投稿（第6版 v6.2・マスターのみ）
+## note 投稿（第6版 v6.3・マスターのみ）
 
 - 記事を開いて「note投稿」を押すと、名簿と同じフォルダ（Markdown to PDF）の `md2pdf-note.json`（予約キュー）に、その記事の行を登録・更新します。投稿そのものは note 自動投稿ツール（GitHub Actions、30分ごと）がキューを読んで行い、結果（Result・note URL・Message）をキューに書き戻します。結果はもう一度「note投稿」を開くと見られます。
 - スプレッドシートは使いません。キューが無ければ最初の登録で作ります。行の削除・並べ替えはしません。
 - 本文（Body）にはこの記事の Drive の URL が入ります。記事をサービスアカウント（noteServiceAccount）に閲覧者、キューを編集者として共有します（通知メールなし）。
-- 共通設定（md2pdf-config.json）: `noteQueue: true`（ボタンを出す）、`noteServiceAccount`、`noteAccounts`（キューに無いときの既定の note ID）。
+- 共通設定（md2pdf-config.json）: `noteQueue: true`（ボタンを出す）、`noteServiceAccount`、`noteAccounts`（キューを新しく作るときの最初の note ID）。
+- note アカウントは「設定」→「記事のフォルダ」の下で追加・外すができます（キューの「アカウント」に保存。外した行は空にして行番号を保ちます）。追加したら GitHub の Secrets に `NOTE_COOKIE_<ID>`（英大文字）で Cookie を登録します。
+- 各フォルダの「note:」で、そのフォルダの記事を投稿するアカウントを決められます（名簿 md2pdf-team.json に保存）。「note投稿」の既定になります。
 - 投稿方法: 予約投稿（日時指定）／通常投稿（次の確認で公開）／下書き保存／投稿済みの記事を上書き。下書き保存以外は記事のステータスを「投稿待ち」にします。

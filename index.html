@@ -323,6 +323,8 @@
   .tm-list li .id { color: var(--muted); font-size: 11px; }
   .tm-list li.empty { color: var(--muted); }
   .tm-list li button { font-size: 11px; padding: 2px 6px; }
+  .tm-list li select.tm-note { font-size: 11px; padding: 2px 4px; width: 170px; flex: none; }
+  .tm-sub { margin: 12px 0 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
   .st .tm-table { table-layout: fixed; }
   .st .tm-table col.c-em { width: 29%; } .st .tm-table col.c-nm { width: 18%; } .st .tm-table col.c-rl { width: 22%; } .st .tm-table col.c-bt { width: 60px; }
   .st .tm-table th, .st .tm-table td { padding: 6px; vertical-align: middle; }
@@ -667,6 +669,14 @@
             <input type="text" id="tm-drive-url" class="wide" placeholder="フォルダの URL" spellcheck="false" autocomplete="off">
             <button type="button" id="tm-drive-url-add">追加</button>
             <button type="button" id="tm-drive-add">Drive から選ぶ</button>
+          </div>
+          <div id="tm-note-box" hidden>
+            <div class="tm-sub">note アカウント</div>
+            <ul id="tm-note-accts" class="tm-list"></ul>
+            <div class="st-line">
+              <input type="text" id="tm-note-id" class="wide" placeholder="note ID または note の URL（例: https://note.com/unicovailab）" spellcheck="false" autocomplete="off">
+              <button type="button" id="tm-note-add">追加</button>
+            </div>
           </div>
         </section>
 
@@ -3913,7 +3923,7 @@ function greet(name) {
           return { email: lowerMail(u.email), name: String(u.name || ''), role: /^(master|user|client)$/.test(u.role) ? u.role : 'user',
             drives: Array.isArray(u.drives) ? u.drives.map(String) : [] };   // クライアントの担当ドライブ（ドライブ単位）
         }) : [];
-        team.drives = Array.isArray(j.drives) ? j.drives.filter(function (d) { return d && d.id; }).map(function (d) { return { id: String(d.id), name: String(d.name || d.id) }; }) : [];
+        team.drives = Array.isArray(j.drives) ? j.drives.filter(function (d) { return d && d.id; }).map(function (d) { return { id: String(d.id), name: String(d.name || d.id), note: String(d.note || '') }; }) : [];
         team.loaded = true;
       });
     });
@@ -4124,7 +4134,8 @@ function greet(name) {
       if (tmDlg.hidden) return;
       // 編集中（保存前）の内容は残す。接続の取り直しなどで画面を作り直しても、追加したユーザーが消えないように
       if (tmWork && !rebuild) { tmRender(); return; }
-      tmWork = { users: team.users.map(function (u) { return { email: u.email, name: u.name, role: u.role, drives: (u.drives || []).slice() }; }), drives: team.drives.map(function (d) { return { id: d.id, name: d.name }; }) };
+      tmWork = { users: team.users.map(function (u) { return { email: u.email, name: u.name, role: u.role, drives: (u.drives || []).slice() }; }), drives: team.drives.map(function (d) { return { id: d.id, name: d.name, note: d.note || '' }; }) };
+      tmNoteLoad();
       // まだマスターがいない（制限なし）ときは、いま接続している自分を最初のマスターにする
       var me = lib.user && lowerMail(lib.user.emailAddress);
       if (me && !teamMode && !tmWork.users.some(function (u) { return u.role === 'master'; }) && !tmWork.users.some(function (u) { return u.email === me; })) {
@@ -4294,8 +4305,109 @@ function greet(name) {
           tmSt(old === x.name ? '名前は変わっていません: ' + x.name : '名前を更新しました: ' + x.name + '（「保存」で確定）');
         }).catch(function (e) { up.disabled = false; tmSt('読み直せませんでした（' + ((e && e.message) || e) + '）'); });
       });
-      li.appendChild(nm); li.appendChild(up); li.appendChild(del);
+      li.appendChild(nm);
+      if (tmNoteOn()) {
+        // この記事のフォルダから投稿する note アカウント（「note投稿」の既定になる）
+        var ns = document.createElement('select'); ns.className = 'tm-note'; ns.title = 'このフォルダの記事を投稿する note アカウント';
+        var o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'note: 未指定'; ns.appendChild(o0);
+        tmNote.accts.forEach(function (a) { var o = document.createElement('option'); o.value = a.id; o.textContent = 'note: ' + a.id; ns.appendChild(o); });
+        if (d.note && !tmNote.accts.some(function (a) { return a.id === d.note; })) { var ox = document.createElement('option'); ox.value = d.note; ox.textContent = 'note: ' + d.note + '（未登録）'; ns.appendChild(ox); }
+        ns.value = d.note || '';
+        ns.addEventListener('change', function () { d.note = ns.value; tmSt('note アカウントを変えました（「保存」で確定）'); });
+        li.appendChild(ns);
+      }
+      li.appendChild(up); li.appendChild(del);
       ul.appendChild(li);
+    });
+    tmNoteRender();
+  }
+  /* --- note アカウント（予約キュー md2pdf-note.json の「アカウント」。マスターだけ） --- */
+  var tmNote = { loaded: false, accts: [], dirty: false };
+  function tmNoteOn() { return role === 'master' && !!driveCfg.noteQueue && !!driveCfg.folderId; }
+  function tmNoteSecret(id) { return 'NOTE_COOKIE_' + String(id).toUpperCase().replace(/[^A-Z0-9]/g, '_'); }
+  function tmNoteLoad() {
+    tmNote = { loaded: false, accts: [], dirty: false };
+    if (!tmNoteOn()) return;
+    npQueueLoad().then(function (q) {
+      var seen = {};
+      (q.data.sheets['アカウント'] || []).slice(1).forEach(function (r) {
+        var id = String((r && r[0]) || '').trim();
+        if (!id || seen[id.toLowerCase()]) return;
+        seen[id.toLowerCase()] = 1;
+        tmNote.accts.push({ id: id, secret: String(r[1] || '') || tmNoteSecret(id), state: String(r[2] || '') });
+      });
+      tmNote.loaded = true;
+      if (tmWork) tmRender();
+    }).catch(function (e) { tmSt('note アカウントを読めませんでした: ' + ((e && e.message) || e)); });
+  }
+  function tmNoteRender() {
+    var box = document.getElementById('tm-note-box');
+    box.hidden = !tmNoteOn();
+    if (box.hidden) return;
+    var ul = document.getElementById('tm-note-accts');
+    ul.innerHTML = '';
+    if (!tmNote.loaded || !tmNote.accts.length) {
+      var li0 = document.createElement('li'); li0.className = 'empty';
+      li0.textContent = tmNote.loaded ? '未登録' : '読み込み中...';
+      ul.appendChild(li0);
+    }
+    tmNote.accts.forEach(function (a, i) {
+      var li = document.createElement('li');
+      var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = a.id + (a.state ? '（' + a.state + '）' : '');
+      var sc = document.createElement('span'); sc.className = 'id'; sc.textContent = 'Secret: ' + a.secret;
+      sc.title = '投稿ツール（GitHub）の Secrets にこの名前で note の Cookie を登録します';
+      var del = document.createElement('button'); del.type = 'button'; del.textContent = '外す';
+      del.addEventListener('click', function () {
+        tmNote.accts.splice(i, 1); tmNote.dirty = true;
+        if (tmWork) tmWork.drives.forEach(function (d) { if (d.note === a.id) d.note = ''; });
+        tmSt('note アカウントを外しました: ' + a.id + '（「保存」で確定）');
+        tmRender();
+      });
+      li.appendChild(nm); li.appendChild(sc); li.appendChild(del);
+      ul.appendChild(li);
+    });
+  }
+  // note ID（または https://note.com/<ID> の URL）を取り出す
+  function tmNoteIdOf(v) {
+    v = String(v || '').trim();
+    var m = /note\.com\/([A-Za-z0-9_]+)/.exec(v);
+    if (m) return m[1];
+    v = v.replace(/^@/, '');
+    return /^[A-Za-z0-9_]+$/.test(v) ? v : '';
+  }
+  document.getElementById('tm-note-add').addEventListener('click', function () {
+    var inp = document.getElementById('tm-note-id');
+    var id = tmNoteIdOf(inp.value);
+    if (!tmNote.loaded) return;
+    if (!id) { tmSt('note ID（英数字と _）か、note のページの URL を入れてください'); return; }
+    if (tmNote.accts.some(function (a) { return a.id.toLowerCase() === id.toLowerCase(); })) { tmSt('すでに登録されています: ' + id); return; }
+    tmNote.accts.push({ id: id, secret: tmNoteSecret(id), state: '' });
+    tmNote.dirty = true;
+    inp.value = '';
+    tmSt('note アカウントを追加しました: ' + id + '（「保存」で確定。GitHub の Secrets に ' + tmNoteSecret(id) + ' を登録してください）');
+    tmRender();
+  });
+  document.getElementById('tm-note-id').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tm-note-add').click(); } });
+  // 保存: キューの「アカウント」を書き換える。外したアカウントの行は空にする（投稿ツールの行番号がずれないように）
+  function tmNoteSave() {
+    if (!tmNoteOn() || !tmNote.dirty) return Promise.resolve();
+    var want = tmNote.accts.slice();
+    return npQueueSave(function (data) {
+      var grid = data.sheets['アカウント'];
+      if (!Array.isArray(grid) || !grid.length) grid = data.sheets['アカウント'] = [['note ID', 'Secret 名', '状態', '最終確認', '担当・メモ']];
+      var keep = {};
+      want.forEach(function (a) { keep[a.id.toLowerCase()] = a; });
+      var have = {};
+      for (var i = 1; i < grid.length; i++) {
+        var id = String((grid[i] && grid[i][0]) || '').trim().toLowerCase();
+        if (!id) continue;
+        if (keep[id] && !have[id]) { have[id] = 1; continue; }
+        grid[i] = ['', '', '', '', ''];
+      }
+      want.forEach(function (a) { if (!have[a.id.toLowerCase()]) grid.push([a.id, a.secret, '', '', '']); });
+    }).then(function (qid) {
+      tmNote.dirty = false;
+      if (qid && driveCfg.noteServiceAccount) return driveShareQuiet(qid, driveCfg.noteServiceAccount, 'writer').catch(function () { /* 共有済みなど */ });
     });
   }
   document.getElementById('tm-add').addEventListener('click', function () {
@@ -4403,6 +4515,9 @@ function greet(name) {
     team.drives = tmWork.drives;
     var failed = [];
     teamSave().then(function () {
+      st.textContent = 'note アカウントを保存中...';
+      return tmNoteSave().catch(function (e) { failed.push('note アカウント（' + ((e && e.message) || e) + '）'); });
+    }).then(function () {
       return jobs.reduce(function (p, job, i) {
         return p.then(function () {
           st.textContent = '共有を設定中 ' + (i + 1) + '/' + jobs.length + ': ' + job.what;
@@ -4929,14 +5044,15 @@ function greet(name) {
       var rows = q.data.sheets['予約表'].slice(1);
       var acctRows = (q.data.sheets['アカウント'] || []).slice(1);
       var accts = acctRows.map(function (x) { return String(x[0] || ''); }).filter(Boolean);
-      (driveCfg.noteAccounts || []).forEach(function (a) { if (accts.indexOf(a) < 0) accts.push(a); });
       np.rows = rows;
       np.row = 0;
       rows.forEach(function (r, i) { if (npFileIdOf(r[4]) === np.file.id) np.row = i + 2; });   // 見出しが1行目
       var cur = np.row ? rows[np.row - 2] : [];
       var last = '';
       try { last = localStorage.getItem('md2pdf-note-acct') || ''; } catch (e) { /* ignore */ }
-      var acct = cur[0] || (accts.indexOf(last) >= 0 ? last : accts[0] || '');
+      // 既定: この記事の行 → 記事のフォルダに決めた note アカウント → 前回使ったもの → 先頭
+      var fd = team.drives.filter(function (d) { return d.id === teamDriveSel(); })[0];
+      var acct = cur[0] || (fd && fd.note && accts.indexOf(fd.note) >= 0 ? fd.note : accts.indexOf(last) >= 0 ? last : accts[0] || '');
       var sel = document.getElementById('np-acct'); sel.innerHTML = '';
       accts.forEach(function (a) {
         var o = document.createElement('option'); o.value = a;
@@ -4968,7 +5084,7 @@ function greet(name) {
         rs.hidden = false;
       }
       document.getElementById('np-go').textContent = np.row ? '予約を更新' : '予約に登録';
-      if (!accts.length) { npSt('note アカウントがありません（共通設定の noteAccounts に note ID を入れてください）'); return; }
+      if (!accts.length) { npSt('note アカウントがありません（「設定」の記事のフォルダの下で追加してください）'); return; }
       npSyncWhen();
       document.getElementById('np-go').disabled = false;
       npSt('');
