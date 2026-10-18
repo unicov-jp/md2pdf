@@ -6,7 +6,5 @@
   "masters": [
     "minatani@e-com01.co.jp"
   ],
-  "gcpProject": "ecom-md2pdf",
-  "noteSheetId": "1B91ecxBiqD362e35aAgNQwshDXKDgSxbaBGoLiVM5v0",
-  "noteServiceAccount": "note-auto-poster@note-auto-posting-tool.iam.gserviceaccount.com"
+  "gcpProject": "ecom-md2pdf"
 }
