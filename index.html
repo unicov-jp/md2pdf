@@ -672,6 +672,16 @@
         </div>
       </section>
 
+      <section class="st-sec" id="tm-gh-sec" hidden>
+        <div class="st-head"><h3>note 投稿ツール（GitHub）</h3><a id="tm-gh-new" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">トークンを作成</a></div>
+        <div class="st-line">
+          <span id="tm-gh-state" class="st-pill">未登録</span>
+          <input type="password" id="tm-gh-token" class="wide" placeholder="GitHub トークン（github_pat_…）" autocomplete="off" spellcheck="false">
+          <button type="button" id="tm-gh-set">登録</button>
+          <button type="button" id="tm-gh-del" hidden>外す</button>
+        </div>
+      </section>
+
       <section class="st-sec" id="tm-root-sec">
         <h3>名簿の保存先</h3>
         <div class="st-cur" id="tm-root">（未設定）</div>
@@ -3293,7 +3303,7 @@ function greet(name) {
       if (!cfg || typeof cfg !== 'object') return;
       teamCfgLoaded = true;
       var merged = {};
-      ['clientId', 'apiKey', 'appId', 'scope', 'folderId', 'folderName', 'folderLink', 'gcpProject', 'noteQueue', 'noteServiceAccount'].forEach(function (k) {
+      ['clientId', 'apiKey', 'appId', 'scope', 'folderId', 'folderName', 'folderLink', 'gcpProject', 'noteQueue', 'noteServiceAccount', 'noteRepo', 'noteWorkflow', 'noteRef'].forEach(function (k) {
         if (cfg[k] !== undefined && cfg[k] !== null && cfg[k] !== '') merged[k] = String(cfg[k]);
       });
       Object.keys(driveCfg).forEach(function (k) { if (driveCfg[k] !== undefined && driveCfg[k] !== '') merged[k] = driveCfg[k]; });
@@ -4171,6 +4181,7 @@ function greet(name) {
     document.getElementById('tm-connect').hidden = connected;
     document.getElementById('tm-root').textContent = driveCfg.folderId ? (driveCfg.folderName || driveCfg.folderId) : '（未設定）';
     document.getElementById('tm-root-sec').hidden = rootFixed;
+    document.getElementById('tm-gh-sec').hidden = !tmNoteOn(); ghRender();
     document.getElementById('tm-testusers').href = 'https://console.cloud.google.com/auth/audience' + (driveCfg.gcpProject ? '?project=' + encodeURIComponent(driveCfg.gcpProject) : '');
     var msg = document.getElementById('tm-roster-msg');
     var box = document.getElementById('tm-roster');
@@ -5158,12 +5169,60 @@ function greet(name) {
     }).catch(function () { return 0; }).then(function (n) { npSyncing = false; return n; });
   }
   // 画面を開いている間: 5分ごと。投稿を待っている記事があるときは1分ごと
+  // 投稿ツールをすぐ起動した直後（15分間）は15秒ごと、投稿を待っているときは1分ごと、それ以外は5分ごと
   var npTick = 0;
   setInterval(function () {
     npTick++;
     if (document.hidden) return;
-    if (npWaitList().length || npTick % 5 === 0) npSyncStatuses();
-  }, 60 * 1000);
+    var w = npWaitList();
+    var fast = w.some(function (x) { return x.kick && Date.now() - x.kick < 15 * 60 * 1000; });
+    if (fast || (w.length && npTick % 4 === 0) || npTick % 20 === 0) npSyncStatuses();
+  }, 15 * 1000);
+  /* --- 投稿ツール（GitHub Actions）をすぐ起動する: マスターの端末にだけ GitHub トークンを置く --- */
+  var GH_KEY = 'md2pdf-gh-token';
+  function ghToken() { try { return localStorage.getItem(GH_KEY) || ''; } catch (e) { return ''; } }
+  function ghRepo() { return driveCfg.noteRepo || 'unicov-jp/note-auto-posting-tool'; }
+  function ghWf() { return driveCfg.noteWorkflow || 'note-post.yml'; }
+  function ghApi(path, opt, tok) {
+    opt = opt || {};
+    return fetch('https://api.github.com/repos/' + ghRepo() + path, {
+      method: opt.method || 'GET',
+      headers: { 'Accept': 'application/vnd.github+json', 'Authorization': 'Bearer ' + (tok || ghToken()), 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' },
+      body: opt.body ? JSON.stringify(opt.body) : undefined
+    }).then(function (r) {
+      if (r.ok) return r.status === 204 ? {} : r.json().catch(function () { return {}; });
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        var why = r.status === 401 ? 'トークンが無効か期限切れです' : r.status === 403 || r.status === 404 ? 'このトークンでは ' + ghRepo() + ' の Actions を動かせません（リポジトリと Actions の Read and write を確認）' : (j && j.message) || ('HTTP ' + r.status);
+        throw new Error(why);
+      });
+    });
+  }
+  // mode: instant（通常投稿・下書き保存）/ run（上書きなどすべて）
+  function ghDispatch(mode) {
+    if (!ghToken()) return Promise.reject(new Error('GitHub トークンが未登録'));
+    return ghApi('/actions/workflows/' + encodeURIComponent(ghWf()) + '/dispatches', { method: 'POST', body: { ref: driveCfg.noteRef || 'main', inputs: { mode: mode } } });
+  }
+  function ghRender() {
+    var has = !!ghToken();
+    var st = document.getElementById('tm-gh-state');
+    st.textContent = has ? '登録済み' : '未登録'; st.classList.toggle('on', has);
+    document.getElementById('tm-gh-del').hidden = !has;
+    document.getElementById('tm-gh-token').placeholder = has ? '別のトークンに変えるときだけ入力' : 'GitHub トークン（github_pat_…）';
+  }
+  document.getElementById('tm-gh-set').addEventListener('click', function () {
+    var inp = document.getElementById('tm-gh-token'), tok = inp.value.trim(), btn = this;
+    if (!tok) { tmSt('GitHub トークンを入れてください'); return; }
+    btn.disabled = true; tmSt('トークンを確認中...');
+    ghApi('/actions/workflows/' + encodeURIComponent(ghWf()), {}, tok).then(function () {
+      try { localStorage.setItem(GH_KEY, tok); } catch (e) { /* ignore */ }
+      inp.value = ''; ghRender();
+      tmSt('GitHub トークンを登録しました（この端末だけに保存）。「すぐに投稿」で投稿ツールをすぐ起動します');
+    }).catch(function (e) { tmSt('登録できません: ' + ((e && e.message) || e)); }).then(function () { btn.disabled = false; });
+  });
+  document.getElementById('tm-gh-del').addEventListener('click', function () {
+    try { localStorage.removeItem(GH_KEY); } catch (e) { /* ignore */ }
+    ghRender(); tmSt('GitHub トークンをこの端末から外しました');
+  });
   /* --- 投稿の完了表示: 「以下にnote記事を投稿しました。」＋ note の URL --- */
   function npRowOf(rows, fid) { var hit = null; rows.forEach(function (r) { if (npFileIdOf(r && r[4]) === fid) hit = r; }); return hit; }
   // 投稿時に変えた本文の箇所（Before/After）。記事ごとにこの端末に覚える
@@ -5222,9 +5281,11 @@ function greet(name) {
     if (waiting && cur[9] !== 'Error' && cur[9] !== 'Drafted' && cur[9] !== 'Missed') {
       rs.classList.add('wait');
       rs.appendChild(document.createElement('br'));
+      var kicked = waiting.kick && Date.now() - waiting.kick < 15 * 60 * 1000;
       rs.appendChild(document.createTextNode(cur[7] === '予約投稿' && cur[1]
         ? cur[1] + ' ' + cur[2] + ' に投稿します。投稿されたら、ここと画面の右下に note の URL を表示します'
-        : '投稿を待っています（投稿ツールは30分ごとに確認します）。投稿されたら、ここと画面の右下に note の URL を表示します'));
+        : kicked ? '投稿ツールを起動しました。1〜3分ほどで投稿します。投稿されたら、ここと画面の右下に note の URL を表示します'
+        : '投稿を待っています（次の定期確認で投稿します）。投稿されたら、ここと画面の右下に note の URL を表示します'));
     }
     if (waiting && np.file) npChgLines(npChgGet(np.file.id)).forEach(function (ln) { rs.appendChild(document.createElement('br')); rs.appendChild(document.createTextNode(ln)); });
     if (cur[11]) { rs.appendChild(document.createElement('br')); var a = document.createElement('a'); a.href = cur[11]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = cur[11]; rs.appendChild(a); }
@@ -5234,7 +5295,7 @@ function greet(name) {
   var NP_WAIT_KEY = 'md2pdf-note-wait';
   function npWaitList() { try { var a = JSON.parse(localStorage.getItem(NP_WAIT_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
   function npWaitSet(a) { try { localStorage.setItem(NP_WAIT_KEY, JSON.stringify(a)); } catch (e) { /* ignore */ } }
-  function npWaitAdd(id, title, since) { var a = npWaitList().filter(function (w) { return w.id !== id; }); a.push({ id: id, title: title, since: since || '' }); npWaitSet(a); }
+  function npWaitAdd(id, title, since, kick) { var a = npWaitList().filter(function (w) { return w.id !== id; }); a.push({ id: id, title: title, since: since || '', kick: kick || 0 }); npWaitSet(a); }
   function npWaitGet(id) { return npWaitList().filter(function (w) { return w.id === id; })[0] || null; }
   // 待っている記事の投稿が終わったか（上書きのときは、前の投稿日時から変わったら完了）
   function npDone(r, w) { return r[9] === 'Posted' && !!r[11] && (!w || !w.since || String(r[10] || '') !== w.since); }
@@ -5362,6 +5423,7 @@ function greet(name) {
     var input = [acct, type === '予約投稿' ? date.replace(/-/g, '/') : '', type === '予約投稿' ? time : '', title, npFileUrl(file.id),
       document.getElementById('np-thumb').value.trim(), tags, type, 'Enable'];
     var warn = [];
+    var kicked = 0;
     // 1. 変更があれば先に保存（投稿ツールは Drive のファイルを読む）
     // 本文の公開日・最終更新日（下書き保存のときは変えない）
     if (type !== '下書き保存' && lib.current && lib.current.id === file.id) {
@@ -5403,6 +5465,13 @@ function greet(name) {
           npFileIdOf(input[5]) ? driveShareQuiet(npFileIdOf(input[5]), driveCfg.noteServiceAccount, 'reader').catch(function (e) { warn.push('サムネイルの共有に失敗: ' + ((e && e.message) || e)); }) : null,
           queueId ? driveShareQuiet(queueId, driveCfg.noteServiceAccount, 'writer').catch(function (e) { warn.push('予約キューの共有に失敗: ' + ((e && e.message) || e)); }) : null
         ]);
+      }).then(function () {
+        // 4. すぐに投稿・下書き保存・上書きは、投稿ツールをすぐ起動する（予約投稿は定期確認で予約する）
+        if (type === '予約投稿') return;
+        if (!ghToken()) { warn.push('GitHub トークンが未登録のため、次の定期確認（30分ごと）で投稿します。「設定」で登録するとすぐに投稿します'); return; }
+        npSt('投稿ツールを起動中...');
+        return ghDispatch(type === '上書き保存' ? 'run' : 'instant').then(function () { kicked = Date.now(); })
+          .catch(function (e) { warn.push('投稿ツールを起動できませんでした（' + ((e && e.message) || e) + '）。次の定期確認で投稿します'); });
       });
     }).then(function () {
       try { localStorage.setItem('md2pdf-note-acct', acct); } catch (e) { /* ignore */ }
@@ -5421,9 +5490,9 @@ function greet(name) {
       document.getElementById('np-go').textContent = '予約を更新';
       var prev = (np.rows && npRowOf(np.rows, file.id)) || [];
       var since = prev[9] === 'Posted' ? String(prev[10] || '') : '';
-      if (type !== '下書き保存') npWaitAdd(file.id, title, since || ' '); else npWaitDel(file.id);
+      if (type !== '下書き保存') npWaitAdd(file.id, title, since || ' ', kicked); else npWaitDel(file.id);
       npRenderRowState(input.concat(['', '', '', '', '']), type !== '下書き保存' ? npWaitGet(file.id) : null);
-      npSt(type === '下書き保存' ? '下書き保存の予約に登録しました' : '予約に登録しました。この画面は閉じても大丈夫です');
+      npSt(warn.length ? warn.join(' / ') : type === '下書き保存' ? (kicked ? '下書き保存を始めました' : '下書き保存の予約に登録しました') : '予約に登録しました。この画面は閉じても大丈夫です');
     }).catch(function (e) { npSt('登録できませんでした: ' + ((e && e.message) || e)); }).then(function () { go.disabled = false; });
   }
   // 共有（通知メールは送らない。すでに共有済みでもエラーにしない）
