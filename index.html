@@ -4182,6 +4182,7 @@ function greet(name) {
     document.getElementById('tm-root').textContent = driveCfg.folderId ? (driveCfg.folderName || driveCfg.folderId) : '（未設定）';
     document.getElementById('tm-root-sec').hidden = rootFixed;
     document.getElementById('tm-gh-sec').hidden = !tmNoteOn(); ghRender();
+    if (tmNoteOn()) privLoad().then(ghRender).catch(function () { /* ignore */ });
     document.getElementById('tm-testusers').href = 'https://console.cloud.google.com/auth/audience' + (driveCfg.gcpProject ? '?project=' + encodeURIComponent(driveCfg.gcpProject) : '');
     var msg = document.getElementById('tm-roster-msg');
     var box = document.getElementById('tm-roster');
@@ -5179,8 +5180,41 @@ function greet(name) {
     if (fast || (w.length && npTick % 4 === 0) || npTick % 20 === 0) npSyncStatuses();
   }, 15 * 1000);
   /* --- 投稿ツール（GitHub Actions）をすぐ起動する: マスターの端末にだけ GitHub トークンを置く --- */
-  var GH_KEY = 'md2pdf-gh-token';
-  function ghToken() { try { return localStorage.getItem(GH_KEY) || ''; } catch (e) { return ''; } }
+  // トークンは Google アカウントごとに保存する: その人のマイドライブ直下の個人設定ファイル（共有しない）
+  var GH_KEY = 'md2pdf-gh-token';   // 以前（端末ごと）の保存場所。見つけたらアカウントへ移す
+  var PRIV_FILE = 'md2pdf-個人設定（共有しないでください）.json';
+  var priv = { who: '', data: null, id: '' };
+  function privWho() { return (lib.user && lowerMail(lib.user.emailAddress)) || ''; }
+  function privLoad() {
+    var who = privWho();
+    if (!who || !libConnectedNow()) return Promise.resolve(null);
+    if (priv.who === who && priv.data) return Promise.resolve(priv.data);
+    return driveFindInFolder(PRIV_FILE, 'root').then(function (id) {
+      if (!id) return {};
+      return driveDownload(id).then(function (b) { return b.text(); }).then(function (t) {
+        priv.id = id;
+        try { var j = JSON.parse(t); return j && typeof j === 'object' ? j : {}; } catch (e) { return {}; }
+      });
+    }).then(function (data) {
+      priv = { who: who, data: data, id: priv.id };
+      // 以前この端末に保存したトークンがあれば、アカウントの保存場所へ移す
+      var old = '';
+      try { old = localStorage.getItem(GH_KEY) || ''; } catch (e) { /* ignore */ }
+      if (old && !data.ghToken) return privSave({ ghToken: old }).then(function () { try { localStorage.removeItem(GH_KEY); } catch (e) { /* ignore */ } return priv.data; });
+      if (old) { try { localStorage.removeItem(GH_KEY); } catch (e) { /* ignore */ } }
+      return data;
+    });
+  }
+  function privSave(patch) {
+    var who = privWho();
+    var data = {};
+    Object.keys((priv.who === who && priv.data) || {}).forEach(function (k) { data[k] = priv.data[k]; });
+    Object.keys(patch).forEach(function (k) { if (patch[k] === '' || patch[k] === null) delete data[k]; else data[k] = patch[k]; });
+    data.account = who; data.updatedAt = new Date().toISOString();
+    return driveUpload(PRIV_FILE, new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json' }), 'application/json', 'root')
+      .then(function (j) { priv = { who: who, data: data, id: (j && j.id) || priv.id }; return data; });
+  }
+  function ghToken() { return (priv.who && priv.who === privWho() && priv.data && priv.data.ghToken) || ''; }
   function ghRepo() { return driveCfg.noteRepo || 'unicov-jp/note-auto-posting-tool'; }
   function ghWf() { return driveCfg.noteWorkflow || 'note-post.yml'; }
   function ghApi(path, opt, tok) {
@@ -5216,14 +5250,16 @@ function greet(name) {
     if (!tok) { tmSt('GitHub トークンを入れてください'); return; }
     btn.disabled = true; tmSt('トークンを確認中...');
     ghApi('/actions/workflows/' + encodeURIComponent(ghWf()), {}, tok).then(function () {
-      try { localStorage.setItem(GH_KEY, tok); } catch (e) { /* ignore */ }
-      inp.value = ''; ghRender();
-      tmSt('GitHub トークンを登録しました（この端末だけに保存）。「すぐに投稿」で投稿ツールをすぐ起動します');
+      tmSt('トークンを保存中...');
+      return privLoad().then(function () { return privSave({ ghToken: tok }); }).then(function () {
+        inp.value = ''; ghRender();
+        tmSt('GitHub トークンを登録しました（' + privWho() + ' のアカウントに保存。どの端末でも使えます）。「すぐに投稿」で投稿ツールをすぐ起動します');
+      });
     }).catch(function (e) { tmSt('登録できません: ' + ((e && e.message) || e)); }).then(function () { btn.disabled = false; });
   });
   document.getElementById('tm-gh-del').addEventListener('click', function () {
-    try { localStorage.removeItem(GH_KEY); } catch (e) { /* ignore */ }
-    ghRender(); tmSt('GitHub トークンをこの端末から外しました');
+    privSave({ ghToken: '' }).then(function () { ghRender(); tmSt('GitHub トークンをこのアカウントから外しました'); })
+      .catch(function (e) { tmSt('外せませんでした: ' + ((e && e.message) || e)); });
   });
   /* --- 投稿の完了表示: 「以下にnote記事を投稿しました。」＋ note の URL --- */
   function npRowOf(rows, fid) { var hit = null; rows.forEach(function (r) { if (npFileIdOf(r && r[4]) === fid) hit = r; }); return hit; }
@@ -5470,10 +5506,12 @@ function greet(name) {
       }).then(function () {
         // 4. すぐに投稿・下書き保存・上書きは、投稿ツールをすぐ起動する（予約投稿は定期確認で予約する）
         if (type === '予約投稿') return;
+        return privLoad().catch(function () { return null; }).then(function () {
         if (!ghToken()) { warn.push('GitHub トークンが未登録のため、次の定期確認（30分ごと）で投稿します。「設定」で登録するとすぐに投稿します'); return; }
         npSt('投稿ツールを起動中...');
         return ghDispatch(type === '上書き保存' ? 'run' : 'instant').then(function () { kicked = Date.now(); })
           .catch(function (e) { warn.push('投稿ツールを起動できませんでした（' + ((e && e.message) || e) + '）。次の定期確認で投稿します'); });
+        });
       });
     }).then(function () {
       try { localStorage.setItem('md2pdf-note-acct', acct); } catch (e) { /* ignore */ }

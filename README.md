@@ -114,6 +114,7 @@ flowchart LR
 
 | 版 | 内容 | 目印（GitHub のブランチ） |
 | --- | --- | --- |
+| 第6版 v6.10（2026-10-28） | GitHub トークンを Google アカウントごとに保存（マイドライブの個人設定ファイル）。どの端末でも使える | release/v6.10 |
 | 第6版 v6.9（2026-10-28） | すぐに投稿・下書き保存・上書きは投稿ツール（GitHub Actions）をその場で起動（マスターの端末に GitHub トークンを登録） | release/v6.9 |
 | 第6版 v6.8（2026-10-28） | note のタイトルを「ファイル名【yyyy年mm月時点】」に自動。本文の公開日・最終更新日を自動更新し、完了表示に Before/After | release/v6.8 |
 | 第6版 v6.7（2026-10-28） | 投稿が終わったら「以下にnote記事を投稿しました。」と note の URL を表示（ダイアログ・画面右下） | release/v6.7 |
@@ -128,12 +129,12 @@ flowchart LR
 | 第4版 v4 | 画面で編集 | release/v4 |
 | 第3版 v3 | Google Drive ポータル | release/v3 |
 
-- 第6版以降はサイトの中にも控えがあります: https://unicov-jp.github.io/md2pdf/versions/v6.9/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.8/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.7/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.6/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.5/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.4/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.3/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.2/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.1/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.0/ （そのまま開いて使えます）
+- 第6版以降はサイトの中にも控えがあります: https://unicov-jp.github.io/md2pdf/versions/v6.10/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.9/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.8/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.7/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.6/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.5/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.4/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.3/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.2/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.1/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.0/ （そのまま開いて使えます）
 - 公開版をある版に戻すには、その版の `index.html` と `md2pdf-config.json` を最上位に上書きして main に反映します。
   例: `git checkout release/v6.0 -- index.html md2pdf-config.json && git commit -m "v6.0 に戻す" && git push origin main`
 - 新しい版を出すときは、`versions/vX.Y/` に控えを作り、`release/vX.Y` のブランチを作ってこの表に1行足します。
 
-## note 投稿（第6版 v6.9・マスターのみ）
+## note 投稿（第6版 v6.10・マスターのみ）
 
 - 記事を開いて「note投稿」を押すと、名簿と同じフォルダ（Markdown to PDF）の `md2pdf-note.json`（予約キュー）に、その記事の行を登録・更新します。投稿そのものは note 自動投稿ツール（GitHub Actions、30分ごと）がキューを読んで行い、結果（Result・note URL・Message）をキューに書き戻します。結果はもう一度「note投稿」を開くと見られます。
 - スプレッドシートは使いません。キューが無ければ最初の登録で作ります。行の削除・並べ替えはしません。
@@ -147,5 +148,5 @@ flowchart LR
 - 投稿の完了表示: 「予約に登録」のあともダイアログは開いたままで投稿を待ちます（投稿を待っている間は1分ごとに確認）。投稿が終わると「以下にnote記事を投稿しました。」と note の URL を表示し、「コピー」でそのまま貼れます。ダイアログを閉じていた場合は、画面の右下に同じ表示を出します（登録した端末で1回だけ）。上書きのときは、前の投稿の結果では完了にしません。
 - タイトル: 自動で「Markdown のファイル名【yyyy年mm月時点】」（予約投稿は予約日の月、それ以外は投稿する日の月）。画面で書き換えも可。
 - 本文の「公開日：yyyy年mm月dd日／最終更新日：yyyy年mm月dd日」: 投稿（下書き保存以外）のときに自動で書き換えて保存します。初めての投稿は両方を投稿日に、投稿済みの記事は公開日をそのまま・最終更新日を投稿日に。完了の表示は「以下にnote記事を投稿しました。／タイトル／URL／Before …／After …」（コピーでそのまま貼れます）。
-- すぐに投稿: 「設定」→「note 投稿ツール（GitHub）」に GitHub のトークンを登録すると、すぐに投稿・下書き保存は mode=instant、上書きは mode=run で投稿ツールのワークフロー（unicov-jp/note-auto-posting-tool の note-post.yml）をその場で起動します（1〜3分で投稿。起動後15分は15秒ごとに結果を確認）。予約投稿は起動せず定期確認で予約します。トークンはその端末のブラウザにだけ保存し、名簿などの共有ファイルには書きません。トークンは Fine-grained で、対象リポジトリを note-auto-posting-tool だけ、権限は Actions: Read and write のみにします。未登録なら次の定期確認（30分ごと）で投稿します。共通設定の noteRepo / noteWorkflow / noteRef で変更できます。
+- すぐに投稿: 「設定」→「note 投稿ツール（GitHub）」に GitHub のトークンを登録すると、すぐに投稿・下書き保存は mode=instant、上書きは mode=run で投稿ツールのワークフロー（unicov-jp/note-auto-posting-tool の note-post.yml）をその場で起動します（1〜3分で投稿。起動後15分は15秒ごとに結果を確認）。予約投稿は起動せず定期確認で予約します。トークンは Google アカウントごとに、その人のマイドライブ直下の「md2pdf-個人設定（共有しないでください）.json」に保存します（同じアカウントならどの端末でも使えます。名簿などの共有ファイルには書きません。以前ブラウザに保存したトークンは自動でこちらへ移します）。「トークンを作成」は名前・持ち主（unicov-jp）・期限366日・Actions: Read and write を入れた状態で GitHub の作成画面を開きます。トークンは Fine-grained で、対象リポジトリを note-auto-posting-tool だけ、権限は Actions: Read and write のみにします。未登録なら次の定期確認（30分ごと）で投稿します。共通設定の noteRepo / noteWorkflow / noteRef で変更できます。
 - 投稿方法: 予約投稿（日時指定）／通常投稿（次の確認で公開）／下書き保存／投稿済みの記事を上書き。下書き保存以外は記事のステータスを「投稿待ち」にします。
