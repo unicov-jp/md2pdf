@@ -5117,6 +5117,7 @@ function greet(name) {
       return npQueueLoad().then(function (q) {
         var want = {};
         var rowsQ = q.data.sheets['予約表'].slice(1);
+        npChgQ = (q.data.md2pdfChanges && typeof q.data.md2pdfChanges === 'object') ? q.data.md2pdfChanges : {};
         var byFile = {};
         rowsQ.forEach(function (r) { var fid = npFileIdOf(r && r[4]); if (fid) byFile[fid] = r; });
         // 完了を待っている記事: 投稿されたら右下に知らせる。エラー・下書き保存・見送りなら待つのをやめる
@@ -5125,7 +5126,7 @@ function greet(name) {
           if (!r) return;
           if (npDone(r, w)) {
             npWaitDel(w.id);
-            if (!(!npDlg.hidden && np.file && np.file.id === w.id)) npToast(w.title || r[3] || '', r[11]);   // ダイアログで見ているときはダイアログに出す
+            if (!(!npDlg.hidden && np.file && np.file.id === w.id)) npToast(w.title || r[3] || '', r[11], npChgGet(w.id));   // ダイアログで見ているときはダイアログに出す
           }
           else if (r[9] === 'Error' || r[9] === 'Drafted' || r[9] === 'Missed' || r[9] === 'Deleted') npWaitDel(w.id);
         });
@@ -5165,18 +5166,28 @@ function greet(name) {
   }, 60 * 1000);
   /* --- 投稿の完了表示: 「以下にnote記事を投稿しました。」＋ note の URL --- */
   function npRowOf(rows, fid) { var hit = null; rows.forEach(function (r) { if (npFileIdOf(r && r[4]) === fid) hit = r; }); return hit; }
-  function npPostedText(url) { return '以下にnote記事を投稿しました。\n' + url; }
-  function npPostedNode(url) {
+  // 投稿時に変えた本文の箇所（Before/After）。記事ごとにこの端末に覚える
+  var NP_CHG_KEY = 'md2pdf-note-change';
+  function npChgAll() { try { var o = JSON.parse(localStorage.getItem(NP_CHG_KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+  var npChgQ = {};   // 予約キューに残した変更箇所（ほかの端末で登録した分）
+  function npChgGet(id) { return npChgAll()[id] || npChgQ[id] || null; }
+  function npChgSet(id, c) { var o = npChgAll(); if (c) o[id] = c; else delete o[id]; try { localStorage.setItem(NP_CHG_KEY, JSON.stringify(o)); } catch (e) { /* ignore */ } }
+  function npChgLines(c) { return c ? ['Before\u3000' + c.before, 'After\u3000' + c.after] : []; }
+  // 完了の文: 以下にnote記事を投稿しました。／タイトル／URL／Before …／After …
+  function npPostedText(url, c, title) { return ['以下にnote記事を投稿しました。'].concat(title ? [title] : [], [url], npChgLines(c)).join('\n'); }
+  function npPostedNode(url, c, title) {
     var box = document.createElement('div'); box.className = 'np-posted';
     box.appendChild(document.createTextNode('以下にnote記事を投稿しました。'));
     box.appendChild(document.createElement('br'));
+    if (title) { var tt = document.createElement('span'); tt.className = 'np-ttl'; tt.textContent = title; box.appendChild(tt); box.appendChild(document.createElement('br')); }
     var a = document.createElement('a'); a.className = 'np-url'; a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = url;
     box.appendChild(a);
+    npChgLines(c).forEach(function (ln) { box.appendChild(document.createElement('br')); box.appendChild(document.createTextNode(ln)); });
     box.appendChild(document.createElement('br'));
     var cp = document.createElement('button'); cp.type = 'button'; cp.className = 'np-copy'; cp.textContent = 'コピー';
-    cp.title = '「以下にnote記事を投稿しました。」と URL をコピーします';
+    cp.title = '「以下にnote記事を投稿しました。」・タイトル・URL・変更箇所をコピーします';
     cp.addEventListener('click', function () {
-      var t = npPostedText(url);
+      var t = npPostedText(url, c, title);
       var ok = function () { cp.textContent = 'コピーしました'; setTimeout(function () { cp.textContent = 'コピー'; }, 1500); };
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, function () { npCopyFallback(t); ok(); });
       else { npCopyFallback(t); ok(); }
@@ -5197,7 +5208,7 @@ function greet(name) {
     if (npDone(cur, waiting && waiting.since !== undefined ? waiting : null)) {
       rs.classList.add('done');
       if (/閉じても大丈夫/.test(document.getElementById('np-state').textContent)) npSt('');
-      rs.appendChild(npPostedNode(cur[11]));
+      rs.appendChild(npPostedNode(cur[11], npChgGet(np.file && np.file.id), cur[3]));
       if (cur[10]) { var sm = document.createElement('div'); sm.className = 'muted'; sm.textContent = '投稿日時: ' + cur[10]; rs.appendChild(sm); }
       rs.hidden = false;
       return;
@@ -5215,6 +5226,7 @@ function greet(name) {
         ? cur[1] + ' ' + cur[2] + ' に投稿します。投稿されたら、ここと画面の右下に note の URL を表示します'
         : '投稿を待っています（投稿ツールは30分ごとに確認します）。投稿されたら、ここと画面の右下に note の URL を表示します'));
     }
+    if (waiting && np.file) npChgLines(npChgGet(np.file.id)).forEach(function (ln) { rs.appendChild(document.createElement('br')); rs.appendChild(document.createTextNode(ln)); });
     if (cur[11]) { rs.appendChild(document.createElement('br')); var a = document.createElement('a'); a.href = cur[11]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = cur[11]; rs.appendChild(a); }
     rs.hidden = false;
   }
@@ -5227,17 +5239,49 @@ function greet(name) {
   // 待っている記事の投稿が終わったか（上書きのときは、前の投稿日時から変わったら完了）
   function npDone(r, w) { return r[9] === 'Posted' && !!r[11] && (!w || !w.since || String(r[10] || '') !== w.since); }
   function npWaitDel(id) { npWaitSet(npWaitList().filter(function (w) { return w.id !== id; })); }
-  function npToast(title, url) {
+  function npToast(title, url, c) {
     var box = document.getElementById('np-toasts');
     var t = document.createElement('div'); t.className = 'np-toast'; t.setAttribute('role', 'status');
-    var h = document.createElement('div'); h.className = 't'; h.textContent = title; h.title = title;
-    t.appendChild(h);
-    t.appendChild(npPostedNode(url));
+    t.appendChild(npPostedNode(url, c, title));
     var row = document.createElement('div'); row.className = 'row';
     var x = document.createElement('button'); x.type = 'button'; x.textContent = '閉じる';
     x.addEventListener('click', function () { box.removeChild(t); });
     row.appendChild(x); t.appendChild(row);
     box.appendChild(t);
+  }
+  /* --- タイトル「ファイル名【yyyy年mm月時点】」と、本文の「公開日／最終更新日」 --- */
+  function npPostDay() {   // 投稿する日（予約投稿は予約日、それ以外は今日）: [yyyy, mm, dd]
+    var t = document.getElementById('np-type').value, d = document.getElementById('np-date').value;
+    var m = t === '予約投稿' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || '');
+    if (m) return [m[1], m[2], m[3]];
+    var n = new Date();
+    return [String(n.getFullYear()), npPad(n.getMonth() + 1), npPad(n.getDate())];
+  }
+  var NP_ASOF = /【\d{4}年\d{1,2}月時点】\s*$/;
+  function npAutoTitle(file) { var d = npPostDay(); return fileTitle(file.name).replace(NP_ASOF, '').trim() + '【' + d[0] + '年' + d[1] + '月時点】'; }
+  // 投稿日を変えたら、タイトル末尾の【yyyy年mm月時点】も合わせる
+  function npSyncTitle() {
+    var el = document.getElementById('np-title');
+    if (np.file && NP_ASOF.test(el.value)) { var d = npPostDay(); el.value = el.value.replace(NP_ASOF, '【' + d[0] + '年' + d[1] + '月時点】'); }
+  }
+  // 本文の「公開日：yyyy年mm月dd日／最終更新日：yyyy年mm月dd日」を書き換える（無ければそのまま）
+  //   初めての投稿: 公開日・最終更新日とも投稿日。投稿済みの記事: 公開日はそのまま、最終更新日を投稿日に
+  var NP_PUB = /(公開日\s*[：:]\s*)(\d{4}|yyyy)年(\d{1,2}|mm)月(\d{1,2}|dd)日/;
+  var NP_UPD = /(最終更新日\s*[：:]\s*)(\d{4}|yyyy)年(\d{1,2}|mm)月(\d{1,2}|dd)日/;
+  // 本文の「公開日：…／最終更新日：…」の部分（無ければ ''）
+  function npDateLine(md) {
+    var m = /公開日\s*[：:][^\n]*?最終更新日\s*[：:]\s*(?:\d{4}|yyyy)年(?:\d{1,2}|mm)月(?:\d{1,2}|dd)日/.exec(md || '');
+    if (m) return m[0];
+    var a = NP_PUB.exec(md || ''), b = NP_UPD.exec(md || '');
+    return [a ? a[0] : '', b ? b[0] : ''].filter(Boolean).join('／');
+  }
+  function npStampDates(md, day, posted) {
+    var ds = day[0] + '年' + day[1] + '月' + day[2] + '日';
+    md = md.replace(NP_PUB, function (all, head, y, m, d) {
+      var real = /^\d/.test(y) && /^\d/.test(m) && /^\d/.test(d);
+      return posted && real ? head + y + '年' + npPad(+m) + '月' + npPad(+d) + '日' : head + ds;
+    });
+    return md.replace(NP_UPD, function (all, head) { return head + ds; });
   }
   function npSyncWhen() { document.getElementById('np-when').hidden = document.getElementById('np-type').value !== '予約投稿'; }
   function openNotePost() {
@@ -5252,6 +5296,7 @@ function greet(name) {
     npDlg.hidden = false;
     npQueueLoad().then(function (q) {
       var rows = q.data.sheets['予約表'].slice(1);
+      npChgQ = (q.data.md2pdfChanges && typeof q.data.md2pdfChanges === 'object') ? q.data.md2pdfChanges : {};
       var acctRows = (q.data.sheets['アカウント'] || []).slice(1);
       var accts = acctRows.map(function (x) { return String(x[0] || ''); }).filter(Boolean);
       np.rows = rows;
@@ -5281,7 +5326,7 @@ function greet(name) {
       document.getElementById('np-time').value = /^\d{1,2}:\d{2}$/.test(cur[2] || '') ? npPad(+cur[2].split(':')[0]) + ':' + cur[2].split(':')[1] : '18:00';
       var posted = cur[9] === 'Posted' || cur[7] === '投稿済み';
       document.getElementById('np-type').value = posted ? '上書き保存' : (['予約投稿', '通常投稿', '下書き保存', '上書き保存'].indexOf(cur[7]) >= 0 ? cur[7] : '予約投稿');
-      document.getElementById('np-title').value = cur[3] || npTitleOf(mdEl.value, np.file.name);
+      document.getElementById('np-title').value = npAutoTitle(np.file);   // タイトルは常に「ファイル名【yyyy年mm月時点】」（この画面で書き換えも可）
       document.getElementById('np-thumb').value = cur[5] || '';
       // サムネイルの既定: 記事と同じフォルダにある、記事と同じ名前の PNG
       if (!cur[5]) {
@@ -5318,12 +5363,27 @@ function greet(name) {
       document.getElementById('np-thumb').value.trim(), tags, type, 'Enable'];
     var warn = [];
     // 1. 変更があれば先に保存（投稿ツールは Drive のファイルを読む）
+    // 本文の公開日・最終更新日（下書き保存のときは変えない）
+    if (type !== '下書き保存' && lib.current && lib.current.id === file.id) {
+      flushAll();
+      var prevRow = (np.rows && npRowOf(np.rows, file.id)) || [];
+      var wasPosted = prevRow[9] === 'Posted' || file.status === 'posted';
+      var beforeLine = npDateLine(mdEl.value);
+      var stamped = npStampDates(mdEl.value, npPostDay(), wasPosted);
+      npChgSet(file.id, beforeLine ? { before: beforeLine, after: npDateLine(stamped) } : null);
+      if (stamped !== mdEl.value) { mdEl.value = stamped; syncFromMarkdown(); histCommit(); }
+      if (!beforeLine) warn.push('本文に「公開日：…／最終更新日：…」が見つからないため、日付は変えていません');
+    } else if (type === '下書き保存') npChgSet(file.id, null);
     var saved = (lib.current && lib.current.id === file.id && isDirty()) ? (npSt('記事を保存中...'), libUpdate()) : Promise.resolve();
     saved.then(function () {
       // 2. 予約キューに書く（この記事の行があれば入力の列だけ書き換え、無ければ末尾に追加）
       npSt('予約を書き込み中...');
       var rowNo = 0;
       return npQueueSave(function (data) {
+        // 投稿時に変えた本文の箇所（Before/After）もキューに残す（ほかの端末でも完了の表示に出す）
+        var chg = npChgAll()[file.id] || null;
+        if (!data.md2pdfChanges || typeof data.md2pdfChanges !== 'object') data.md2pdfChanges = {};
+        if (chg) data.md2pdfChanges[file.id] = chg; else delete data.md2pdfChanges[file.id];
         var grid = data.sheets['予約表'];
         rowNo = 0;
         grid.forEach(function (r, i) { if (i > 0 && npFileIdOf(r[4]) === file.id) rowNo = i + 1; });
@@ -5374,7 +5434,8 @@ function greet(name) {
   document.getElementById('btn-note').addEventListener('click', openNotePost);
   document.getElementById('np-close').addEventListener('click', closeNotePost);
   document.getElementById('np-go').addEventListener('click', doNotePost);
-  document.getElementById('np-type').addEventListener('change', npSyncWhen);
+  document.getElementById('np-type').addEventListener('change', function () { npSyncWhen(); npSyncTitle(); });
+  document.getElementById('np-date').addEventListener('change', npSyncTitle);
   npDlg.addEventListener('click', function (e) { if (e.target === npDlg) closeNotePost(); });
 
   /* ---------- shortcuts ---------- */
