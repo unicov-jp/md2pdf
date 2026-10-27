@@ -5080,6 +5080,18 @@ function greet(name) {
     var m = /^#\s+(.+?)\s*#*\s*$/m.exec(md || '');
     return m ? m[1].replace(/\*\*/g, '').trim() : fileTitle(name || '');
   }
+  // 記事（タイトル.md / タイトル_yyyymmdd.md）と同じフォルダ直下の「同名.png」を探す。無ければ ''
+  function npDefaultThumb(file) {
+    var folderId = (file && file.folder) || libFolderId();
+    if (!file || !folderId) return Promise.resolve('');
+    var base = String(file.name || '').replace(/\.(md|markdown|txt)$/i, '');
+    var names = [base + '.png', base + '.PNG'];
+    var t = fileTitle(file.name);
+    if (t !== base) names.push(t + '.png', t + '.PNG');
+    return names.reduce(function (p, nm) {
+      return p.then(function (found) { return found || driveFindInFolder(nm, folderId).catch(function () { return ''; }); });
+    }, Promise.resolve('')).then(function (id) { return id ? npFileUrl(id) : ''; });
+  }
   function npSyncWhen() { document.getElementById('np-when').hidden = document.getElementById('np-type').value !== '予約投稿'; }
   function openNotePost() {
     if (role !== 'master' || !driveCfg.noteQueue) return;
@@ -5124,6 +5136,14 @@ function greet(name) {
       document.getElementById('np-type').value = posted ? '上書き保存' : (['予約投稿', '通常投稿', '下書き保存', '上書き保存'].indexOf(cur[7]) >= 0 ? cur[7] : '予約投稿');
       document.getElementById('np-title').value = cur[3] || npTitleOf(mdEl.value, np.file.name);
       document.getElementById('np-thumb').value = cur[5] || '';
+      // サムネイルの既定: 記事と同じフォルダにある、記事と同じ名前の PNG
+      if (!cur[5]) {
+        var thumbFor = np.file;
+        npDefaultThumb(thumbFor).then(function (url) {
+          var t = document.getElementById('np-thumb');
+          if (url && np.file === thumbFor && !npDlg.hidden && !t.value) t.value = url;
+        }).catch(function () { /* 見つからなければ空のまま */ });
+      }
       document.getElementById('np-tags').value = (tags || '').replace(/\n+$/, '');
       if (np.row) {
         var parts = ['登録済み'];
@@ -5182,6 +5202,7 @@ function greet(name) {
         npSt('投稿ツールに共有中...');
         return Promise.all([
           driveShareQuiet(file.id, driveCfg.noteServiceAccount, 'reader').catch(function (e) { warn.push('記事の共有に失敗: ' + ((e && e.message) || e)); }),
+          npFileIdOf(input[5]) ? driveShareQuiet(npFileIdOf(input[5]), driveCfg.noteServiceAccount, 'reader').catch(function (e) { warn.push('サムネイルの共有に失敗: ' + ((e && e.message) || e)); }) : null,
           queueId ? driveShareQuiet(queueId, driveCfg.noteServiceAccount, 'writer').catch(function (e) { warn.push('予約キューの共有に失敗: ' + ((e && e.message) || e)); }) : null
         ]);
       });
