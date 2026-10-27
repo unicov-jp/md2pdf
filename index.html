@@ -258,7 +258,8 @@
   #lib-list li .meta { color: var(--muted); font-size: 11px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #lib-list li .row2 { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
   #lib-list li .note-go { flex: 0 0 auto; font-size: 11px; line-height: 1; padding: 4px 8px; border-radius: 999px; border: 1px solid #22c55e; color: #15803d; background: var(--panel); text-decoration: none; white-space: nowrap; }
-  #lib-list li .note-go:hover { background: rgba(34, 197, 94, .12); }
+  #lib-list li a.note-go:hover { background: rgba(34, 197, 94, .12); }
+  #lib-list li .note-go.off { border-color: var(--border); color: var(--muted); opacity: .6; cursor: default; }
   @media (prefers-color-scheme: dark) { #lib-list li .note-go { color: #4ade80; } }
   #lib-list li .st-sel { flex: 0 0 auto; font-size: 11px; padding: 1px 4px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); cursor: pointer; }
   #lib-list li .st-sel:disabled { cursor: default; opacity: 1; }
@@ -2943,15 +2944,22 @@ function greet(name) {
       var row2 = document.createElement('span');
       row2.className = 'row2';
       row2.appendChild(meta);
-      // 投稿済みの記事は、note の記事へジャンプするボタン（新しいタブで開く）
+      // 「note」ボタン: 投稿済みは note の記事へジャンプ（新しいタブ）、それ以外はグレーで押せない
       var nf = stv === 'posted' ? g.files.filter(function (x) { return x.noteUrl; })[0] : null;
+      var go;
       if (nf) {
-        var go = document.createElement('a');
+        go = document.createElement('a');
         go.className = 'note-go'; go.href = nf.noteUrl; go.target = '_blank'; go.rel = 'noopener';
-        go.textContent = 'note'; go.title = 'note の記事を開く: ' + nf.noteUrl;
+        go.title = 'note の記事を開く: ' + nf.noteUrl;
         go.addEventListener('click', function (e) { e.stopPropagation(); });
-        row2.appendChild(go);
+      } else {
+        go = document.createElement('span');
+        go.className = 'note-go off';
+        go.title = stv === 'posted' ? 'note の URL を確認中です' : 'まだ note に投稿されていません';
+        go.setAttribute('aria-disabled', 'true');
       }
+      go.textContent = 'note';
+      row2.appendChild(go);
       row2.appendChild(stSel);
       li.appendChild(fn);
       li.appendChild(row2);
