@@ -1,0 +1,16 @@
+{
+  "clientId": "837211791498-sbodu7bpaa0lhmf6akfgv1q03s033e7u.apps.googleusercontent.com",
+  "scope": "full",
+  "folderId": "1eXmBHKPk3YVYElaBTygAGe6DYy-Fk_B7",
+  "folderName": "Markdown to PDF",
+  "masters": [
+    "minatani@e-com01.co.jp"
+  ],
+  "gcpProject": "ecom-md2pdf",
+  "noteQueue": true,
+  "noteServiceAccount": "note-auto-poster@note-auto-posting-tool.iam.gserviceaccount.com",
+  "noteAccounts": [
+    "nakagin_lifecare",
+    "unicovailab"
+  ]
+}

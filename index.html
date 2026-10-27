@@ -3037,6 +3037,7 @@ function greet(name) {
       libRenderList();
       libRefreshButtons();
       if (!quiet) setStatus('一覧: ' + files.length + ' ファイル');
+      npSyncStatuses();
       flushAll();
       if (mdEl.value) renderPreview(mdEl.value);
     }).catch(function (e) {
@@ -5092,6 +5093,42 @@ function greet(name) {
       return p.then(function (found) { return found || driveFindInFolder(nm, folderId).catch(function () { return ''; }); });
     }, Promise.resolve('')).then(function (id) { return id ? npFileUrl(id) : ''; });
   }
+  // note の投稿結果（予約キューの Result）を一覧のステータスに反映する
+  //   Posted（投稿済み）→「投稿済み」、Scheduled（予約済み）→「投稿待ち」（すでに投稿待ち・投稿済みなら変えない）
+  // 一覧を読み込んだとき・5分ごと（画面を開いている間）に確かめる。クライアントは行わない
+  var npSyncing = false;
+  function npSyncStatuses() {
+    if (npSyncing || !driveCfg.noteQueue || !driveCfg.folderId || role === 'client' || !lib.loaded || !lib.files.length || !libConnectedNow()) return Promise.resolve(0);
+    npSyncing = true;
+    return driveFindInFolder(NOTE_QUEUE_FILE, driveCfg.folderId).then(function (id) {
+      if (!id) return 0;
+      return npQueueLoad().then(function (q) {
+        var want = {};
+        q.data.sheets['予約表'].slice(1).forEach(function (r) {
+          var fid = npFileIdOf(r && r[4]);
+          if (!fid || r[8] === 'Disable') return;
+          if (r[9] === 'Posted' || r[7] === '投稿済み') want[fid] = 'posted';
+          else if (r[9] === 'Scheduled' && want[fid] !== 'posted') want[fid] = 'ready';
+        });
+        var jobs = [];
+        lib.files.forEach(function (f) {
+          var st = want[f.id];
+          if (!st || f.status === st || f.status === 'posted' || (st === 'ready' && f.status === 'ready')) return;
+          jobs.push(driveSetStatus(f.id, st).then(function () {
+            f.status = st;
+            if (lib.current && lib.current.id === f.id) lib.current.status = st;
+            return 1;
+          }).catch(function () { return 0; }));
+        });
+        return Promise.all(jobs).then(function (rs) {
+          var n = rs.reduce(function (a, b) { return a + b; }, 0);
+          if (n) { libRenderList(); setStatus('note の投稿結果を一覧のステータスに反映しました（' + n + ' 件）'); }
+          return n;
+        });
+      });
+    }).catch(function () { return 0; }).then(function (n) { npSyncing = false; return n; });
+  }
+  setInterval(function () { if (!document.hidden) npSyncStatuses(); }, 5 * 60 * 1000);
   function npSyncWhen() { document.getElementById('np-when').hidden = document.getElementById('np-type').value !== '予約投稿'; }
   function openNotePost() {
     if (role !== 'master' || !driveCfg.noteQueue) return;
