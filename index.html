@@ -257,6 +257,9 @@
   #lib-list li .fn { display: block; word-break: break-all; }
   #lib-list li .meta { color: var(--muted); font-size: 11px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #lib-list li .row2 { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+  #lib-list li .note-go { flex: 0 0 auto; font-size: 11px; line-height: 1; padding: 4px 8px; border-radius: 999px; border: 1px solid #22c55e; color: #15803d; background: var(--panel); text-decoration: none; white-space: nowrap; }
+  #lib-list li .note-go:hover { background: rgba(34, 197, 94, .12); }
+  @media (prefers-color-scheme: dark) { #lib-list li .note-go { color: #4ade80; } }
   #lib-list li .st-sel { flex: 0 0 auto; font-size: 11px; padding: 1px 4px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); cursor: pointer; }
   #lib-list li .st-sel:disabled { cursor: default; opacity: 1; }
   #lib-list li .st-sel[data-st="draft"] { color: #b45309; border-color: #f59e0b; }
@@ -2695,7 +2698,8 @@ function greet(name) {
     return {
       id: f.id, name: f.name, modifiedTime: f.modifiedTime || '', size: f.size, version: f.version || '',
       webViewLink: f.webViewLink || '', lastModifiedBy: (f.lastModifyingUser && f.lastModifyingUser.displayName) || '',
-      status: (f.appProperties && f.appProperties.md2pdfStatus) || ''
+      status: (f.appProperties && f.appProperties.md2pdfStatus) || '',
+      noteUrl: (f.appProperties && f.appProperties.md2pdfNoteUrl) || ''   // 投稿した note 記事の URL
     };
   }
   // 記事ごとのサブフォルダ（1階層）の .md も一覧に出す。images・99.（古い版置き場）などは除く
@@ -2730,6 +2734,14 @@ function greet(name) {
   function driveSetStatus(id, st) {
     return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?supportsAllDrives=true&fields=id,appProperties',
       { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appProperties: { md2pdfStatus: st || null } }) })
+      .then(function (r) { return r.json(); });
+  }
+  // ステータスと note の URL をまとめて書く（チームで共有）
+  function driveSetNoteProps(id, st, url) {
+    var ap = { md2pdfStatus: st || null };
+    if (url !== undefined) ap.md2pdfNoteUrl = url || null;
+    return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?supportsAllDrives=true&fields=id,appProperties',
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appProperties: ap }) })
       .then(function (r) { return r.json(); });
   }
   function driveFileMeta(id) {
@@ -2931,6 +2943,15 @@ function greet(name) {
       var row2 = document.createElement('span');
       row2.className = 'row2';
       row2.appendChild(meta);
+      // 投稿済みの記事は、note の記事へジャンプするボタン（新しいタブで開く）
+      var nf = stv === 'posted' ? g.files.filter(function (x) { return x.noteUrl; })[0] : null;
+      if (nf) {
+        var go = document.createElement('a');
+        go.className = 'note-go'; go.href = nf.noteUrl; go.target = '_blank'; go.rel = 'noopener';
+        go.textContent = 'note'; go.title = 'note の記事を開く: ' + nf.noteUrl;
+        go.addEventListener('click', function (e) { e.stopPropagation(); });
+        row2.appendChild(go);
+      }
       row2.appendChild(stSel);
       li.appendChild(fn);
       li.appendChild(row2);
@@ -5128,7 +5149,7 @@ function greet(name) {
     return driveFindInFolder(NOTE_QUEUE_FILE, driveCfg.folderId).then(function (id) {
       if (!id) return 0;
       return npQueueLoad().then(function (q) {
-        var want = {};
+        var want = {}, urls = {};
         var rowsQ = q.data.sheets['予約表'].slice(1);
         npChgQ = (q.data.md2pdfChanges && typeof q.data.md2pdfChanges === 'object') ? q.data.md2pdfChanges : {};
         var byFile = {};
@@ -5149,16 +5170,22 @@ function greet(name) {
         rowsQ.forEach(function (r) {
           var fid = npFileIdOf(r && r[4]);
           if (!fid || r[8] === 'Disable') return;
-          if (r[9] === 'Posted' || r[7] === '投稿済み') want[fid] = 'posted';
+          if (r[9] === 'Posted' || r[7] === '投稿済み') { want[fid] = 'posted'; if (r[11]) urls[fid] = r[11]; }
           else if (r[9] === 'Scheduled' && want[fid] !== 'posted') want[fid] = 'scheduled';
         });
         var jobs = [];
         lib.files.forEach(function (f) {
           var st = want[f.id];
-          if (!st || f.status === st || f.status === 'posted') return;
-          jobs.push(driveSetStatus(f.id, st).then(function () {
-            f.status = st;
-            if (lib.current && lib.current.id === f.id) lib.current.status = st;
+          var url = urls[f.id] || '';
+          var urlNew = st === 'posted' && url && f.noteUrl !== url;   // 投稿済みの記事の note URL（一覧のジャンプ用）
+          if (!st || ((f.status === st || f.status === 'posted') && !urlNew)) return;
+          var put = f.status === 'posted' ? 'posted' : st;
+          jobs.push(driveSetNoteProps(f.id, put, urlNew ? url : undefined).then(function () {
+            var changed = f.status !== put;
+            f.status = put;
+            if (urlNew) f.noteUrl = url;
+            if (lib.current && lib.current.id === f.id) { lib.current.status = put; if (urlNew) lib.current.noteUrl = url; }
+            if (!changed) { libRenderList(); return 0; }
             return 1;
           }).catch(function () { return 0; }));
         });
