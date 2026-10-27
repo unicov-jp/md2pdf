@@ -684,13 +684,12 @@
               <td><input type="text" id="tm-fa-client" placeholder="顧客名（空なら親フォルダ名）" autocomplete="off"></td>
               <td><input type="text" id="tm-drive-url" placeholder="フォルダの URL" spellcheck="false" autocomplete="off"></td>
               <td class="n"><input type="text" id="tm-fa-tags" placeholder="#タグ #タグ" autocomplete="off"></td>
-              <td class="n"><input type="text" id="tm-fa-note" placeholder="note ID" list="tm-note-list" spellcheck="false" autocomplete="off"></td>
+              <td class="n"><input type="text" id="tm-fa-note" placeholder="note ID を入力" spellcheck="false" autocomplete="off"></td>
               <td class="n sc" id="tm-fa-secret"></td>
               <td><button type="button" id="tm-drive-add" title="Google Drive からフォルダを選んで追加します">Drive</button></td>
               <td><button type="button" id="tm-drive-url-add" class="primary">追加</button></td>
             </tr></tfoot>
           </table>
-          <datalist id="tm-note-list"></datalist>
         </section>
 
         <section class="st-sec">
@@ -4357,10 +4356,10 @@ function greet(name) {
       var ni = tmCellInput(d.note, 'note ID', function (inp) {
         var id = inp.value.trim() ? tmNoteIdOf(inp.value) : '';
         inp.classList.toggle('bad', !!inp.value.trim() && !id);
-        if (inp.value.trim() && !id) { tmSt('note ID は英数字と _ で入れてください（note のページの URL でも可）'); return; }
+        if (inp.value.trim() && !id) { tmSt('note ID は半角の英数字・_・- で入れてください（note のページの URL でも可）'); return; }
         d.note = id; setSc(id); tmSt('note ID を変えました（「保存」で確定）');
       });
-      ni.setAttribute('list', 'tm-note-list'); ni.spellcheck = false;
+      ni.spellcheck = false; ni.placeholder = 'note ID を入力';
       ni.addEventListener('change', function () { if (d.note && ni.value !== d.note) ni.value = d.note; });   // URL を貼ったら ID に直す
       tr.insertBefore(document.createElement('td'), sc).className = 'n';
       sc.previousSibling.appendChild(ni);
@@ -4385,15 +4384,12 @@ function greet(name) {
       td().appendChild(del);
       tb.appendChild(tr);
     });
-    // note ID の候補（予約キューのアカウント＋各フォルダの ID）
-    var dl = document.getElementById('tm-note-list'); dl.innerHTML = '';
-    var ids = [];
-    tmNote.accts.map(function (x) { return x.id; }).concat(tmWork.drives.map(function (x) { return x.note; })).forEach(function (id) { if (id && ids.indexOf(id) < 0) ids.push(id); });
-    ids.forEach(function (id) { var o = document.createElement('option'); o.value = id; dl.appendChild(o); });
     tmFaSecret();
   }
   function tmFaSecret() {
-    var id = tmNoteIdOf(document.getElementById('tm-fa-note').value);
+    var inp = document.getElementById('tm-fa-note');
+    var id = tmNoteIdOf(inp.value);
+    inp.classList.toggle('bad', !!inp.value.trim() && !id);
     document.getElementById('tm-fa-secret').textContent = id ? tmNoteSecret(id) : '';
   }
   document.getElementById('tm-fa-note').addEventListener('input', tmFaSecret);
@@ -4419,10 +4415,10 @@ function greet(name) {
   // note ID（または https://note.com/<ID> の URL）を取り出す
   function tmNoteIdOf(v) {
     v = String(v || '').trim();
-    var m = /note\.com\/([A-Za-z0-9_]+)/.exec(v);
+    var m = /note\.com\/([A-Za-z0-9_-]+)/.exec(v);
     if (m) return m[1];
     v = v.replace(/^@/, '');
-    return /^[A-Za-z0-9_]+$/.test(v) ? v : '';
+    return /^[A-Za-z0-9_-]+$/.test(v) ? v : '';
   }
   // 保存: 各フォルダの note ID を予約キューの「アカウント」に反映する。
   // 新しい ID は末尾に追加。フォルダから外した（変えた）ID で、どのフォルダにも使われなくなったものは行を空にする（投稿ツールの行番号がずれないように）
@@ -4489,7 +4485,7 @@ function greet(name) {
     if (tmWork.drives.some(function (d) { return d.id === f.id; })) { st.textContent = 'すでに追加されています: ' + (f.name || f.id); return; }
     var cl = document.getElementById('tm-fa-client'), tg = document.getElementById('tm-fa-tags'), ni = document.getElementById('tm-fa-note');
     var note = ni.value.trim() ? tmNoteIdOf(ni.value) : '';
-    if (ni.value.trim() && !note) { st.textContent = 'note ID は英数字と _ で入れてください（note のページの URL でも可）'; return; }
+    if (ni.value.trim() && !note) { st.textContent = 'note ID は半角の英数字・_・- で入れてください（note のページの URL でも可）'; return; }
     var d = tmDriveNorm({ id: f.id, client: cl.value.trim() || f.parent || '', folder: f.folder || f.name || f.id, parent: f.parent || '', tags: tmTagsOf(tg.value), note: note });
     tmWork.drives.push(d);
     cl.value = ''; tg.value = ''; ni.value = ''; document.getElementById('tm-drive-url').value = '';
@@ -4505,7 +4501,12 @@ function greet(name) {
     var inp = document.getElementById('tm-drive-url');
     var id = driveIdFromUrl(inp.value);
     if (!tmWork) return;
-    if (!id) { st.textContent = 'フォルダの URL（https://drive.google.com/drive/folders/…）または ID を入れてください'; return; }
+    if (!id) {
+      inp.classList.add('bad'); inp.focus();
+      st.textContent = '追加するフォルダの URL（https://drive.google.com/drive/folders/…）を入れてください（または「Drive」で選ぶ）。既存のフォルダの note ID は、その行の note ID 欄を書き換えて「保存」します';
+      return;
+    }
+    inp.classList.remove('bad');
     st.textContent = 'フォルダを確認中...';
     driveFolderLabel(id).then(tmAddDrive).catch(function (e) { st.textContent = 'このフォルダは追加できません（' + ((e && e.message) || e) + '）。URL と、あなたに閲覧権限があるかを確認してください'; });
   });
