@@ -673,7 +673,7 @@
       </section>
 
       <section class="st-sec" id="tm-gh-sec" hidden>
-        <div class="st-head"><h3>note 投稿ツール（GitHub）</h3><a id="tm-gh-new" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">トークンを作成</a></div>
+        <div class="st-head"><h3>note 投稿ツール（GitHub）</h3><a id="tm-gh-new" href="https://github.com/settings/personal-access-tokens/new?name=md2pdf+note+post&amp;description=Start+note-auto-posting-tool+from+md2pdf&amp;target_name=unicov-jp&amp;expires_in=366&amp;actions=write" target="_blank" rel="noopener">トークンを作成</a></div>
         <div class="st-line">
           <span id="tm-gh-state" class="st-pill">未登録</span>
           <input type="password" id="tm-gh-token" class="wide" placeholder="GitHub トークン（github_pat_…）" autocomplete="off" spellcheck="false">
@@ -5207,6 +5207,8 @@ function greet(name) {
     var st = document.getElementById('tm-gh-state');
     st.textContent = has ? '登録済み' : '未登録'; st.classList.toggle('on', has);
     document.getElementById('tm-gh-del').hidden = !has;
+    // 作成画面を、名前・持ち主（リポジトリのオーナー）・期限・Actions の権限を入れた状態で開く
+    document.getElementById('tm-gh-new').href = 'https://github.com/settings/personal-access-tokens/new?name=md2pdf+note+post&description=Start+note-auto-posting-tool+from+md2pdf&target_name=' + encodeURIComponent(ghRepo().split('/')[0]) + '&expires_in=366&actions=write';
     document.getElementById('tm-gh-token').placeholder = has ? '別のトークンに変えるときだけ入力' : 'GitHub トークン（github_pat_…）';
   }
   document.getElementById('tm-gh-set').addEventListener('click', function () {
