@@ -114,6 +114,7 @@ flowchart LR
 
 | 版 | 内容 | 目印（GitHub のブランチ） |
 | --- | --- | --- |
+| 第6版 v6.7（2026-10-28） | 投稿が終わったら「以下にnote記事を投稿しました。」と note の URL を表示（ダイアログ・画面右下） | release/v6.7 |
 | 第6版 v6.6（2026-10-28） | note の投稿結果を一覧のステータスに自動で反映（投稿済み・投稿待ち） | release/v6.6 |
 | 第6版 v6.5（2026-10-28） | note 投稿のサムネイルの既定を「記事と同じフォルダの同名 PNG」に | release/v6.5 |
 | 第6版 v6.4（2026-10-27） | note ID 欄を入力欄に（候補のプルダウンをやめる）・- を含む ID に対応。記事のフォルダを1行の表に（顧客名・フォルダ・ハッシュタグ・note ID・note Secret・更新・削除）。ハッシュタグは note 投稿の既定 | release/v6.4 |
@@ -125,12 +126,12 @@ flowchart LR
 | 第4版 v4 | 画面で編集 | release/v4 |
 | 第3版 v3 | Google Drive ポータル | release/v3 |
 
-- 第6版以降はサイトの中にも控えがあります: https://unicov-jp.github.io/md2pdf/versions/v6.6/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.5/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.4/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.3/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.2/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.1/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.0/ （そのまま開いて使えます）
+- 第6版以降はサイトの中にも控えがあります: https://unicov-jp.github.io/md2pdf/versions/v6.7/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.6/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.5/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.4/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.3/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.2/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.1/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.0/ （そのまま開いて使えます）
 - 公開版をある版に戻すには、その版の `index.html` と `md2pdf-config.json` を最上位に上書きして main に反映します。
   例: `git checkout release/v6.0 -- index.html md2pdf-config.json && git commit -m "v6.0 に戻す" && git push origin main`
 - 新しい版を出すときは、`versions/vX.Y/` に控えを作り、`release/vX.Y` のブランチを作ってこの表に1行足します。
 
-## note 投稿（第6版 v6.6・マスターのみ）
+## note 投稿（第6版 v6.7・マスターのみ）
 
 - 記事を開いて「note投稿」を押すと、名簿と同じフォルダ（Markdown to PDF）の `md2pdf-note.json`（予約キュー）に、その記事の行を登録・更新します。投稿そのものは note 自動投稿ツール（GitHub Actions、30分ごと）がキューを読んで行い、結果（Result・note URL・Message）をキューに書き戻します。結果はもう一度「note投稿」を開くと見られます。
 - スプレッドシートは使いません。キューが無ければ最初の登録で作ります。行の削除・並べ替えはしません。
@@ -141,4 +142,5 @@ flowchart LR
 - note ID を入れると、予約キューの「アカウント」に追加されます。どのフォルダにも使われなくなった note ID は、その行を空にします（行番号は保ちます）。note Secret の名前（`NOTE_COOKIE_<ID>`）で、GitHub の Secrets に Cookie を登録します。
 - サムネイルの既定: 記事（.md）と同じフォルダ直下にある、記事と同じ名前の PNG（例: タイトル.md → タイトル.png。日付付きのファイル名なら日付なしの名前も探す）。その記事の予約にサムネイルが入っていればそちらを使います。PNG もサービスアカウントに閲覧者として共有します。
 - ステータスの自動反映: 一覧を読み込んだとき（再読込を含む）と、画面を開いている間 5 分ごとに予約キューの結果を確かめ、投稿された記事を「投稿済み」、予約済みの記事を「投稿待ち」にします（投稿済みは戻しません。停止中の行は見ません）。マスター・ユーザーの画面で行い、クライアントの画面では行いません。
+- 投稿の完了表示: 「予約に登録」のあともダイアログは開いたままで投稿を待ちます（投稿を待っている間は1分ごとに確認）。投稿が終わると「以下にnote記事を投稿しました。」と note の URL を表示し、「コピー」でそのまま貼れます。ダイアログを閉じていた場合は、画面の右下に同じ表示を出します（登録した端末で1回だけ）。上書きのときは、前の投稿の結果では完了にしません。
 - 投稿方法: 予約投稿（日時指定）／通常投稿（次の確認で公開）／下書き保存／投稿済みの記事を上書き。下書き保存以外は記事のステータスを「投稿待ち」にします。

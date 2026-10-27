@@ -63,6 +63,17 @@
   .np-row-state { font-size: 12px; padding: 8px 10px; border-radius: 6px; background: var(--bg); line-height: 1.6; }
   .np-row-state[hidden] { display: none; }
   .np-row-state a { color: var(--accent); }
+  .np-posted { font-size: 13px; line-height: 1.7; }
+  .np-posted .np-url { word-break: break-all; }
+  .np-posted .np-copy { margin-top: 6px; font-size: 12px; padding: 3px 10px; }
+  .np-row-state.done { background: #e8f5ec; border: 1px solid #b7dfc3; }
+  .np-row-state.wait { background: #fff8e6; border: 1px solid #f0d58a; }
+  .np-toasts { position: fixed; right: 16px; bottom: 16px; z-index: 90; display: flex; flex-direction: column; gap: 8px; max-width: min(440px, calc(100vw - 32px)); }
+  .np-toast { background: var(--panel); color: var(--text); border: 1px solid #b7dfc3; border-left: 4px solid #2e9e57; border-radius: 8px; padding: 10px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+  .np-toast .t { font-size: 12px; color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np-toast .row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
+  .np-toast button { font-size: 12px; padding: 3px 10px; }
+  .np-toast a { color: var(--accent); }
   #btn-note[hidden] { display: none; }
   /* Google Drive から開く */
   #od-q { width: 100%; }
@@ -814,6 +825,7 @@
 </div>
 
 <!-- note に投稿（予約表に登録） -->
+<div id="np-toasts" class="np-toasts no-print" aria-live="polite"></div>
 <div id="np-dlg" class="dlg no-print" hidden>
   <div class="dlg-panel narrow st" role="dialog" aria-label="note に投稿">
     <div class="dlg-bar"><strong>note に投稿</strong></div>
@@ -5098,13 +5110,29 @@ function greet(name) {
   // 一覧を読み込んだとき・5分ごと（画面を開いている間）に確かめる。クライアントは行わない
   var npSyncing = false;
   function npSyncStatuses() {
-    if (npSyncing || !driveCfg.noteQueue || !driveCfg.folderId || role === 'client' || !lib.loaded || !lib.files.length || !libConnectedNow()) return Promise.resolve(0);
+    if (npSyncing || !driveCfg.noteQueue || !driveCfg.folderId || role === 'client' || !libConnectedNow()) return Promise.resolve(0);
     npSyncing = true;
     return driveFindInFolder(NOTE_QUEUE_FILE, driveCfg.folderId).then(function (id) {
       if (!id) return 0;
       return npQueueLoad().then(function (q) {
         var want = {};
-        q.data.sheets['予約表'].slice(1).forEach(function (r) {
+        var rowsQ = q.data.sheets['予約表'].slice(1);
+        var byFile = {};
+        rowsQ.forEach(function (r) { var fid = npFileIdOf(r && r[4]); if (fid) byFile[fid] = r; });
+        // 完了を待っている記事: 投稿されたら右下に知らせる。エラー・下書き保存・見送りなら待つのをやめる
+        npWaitList().forEach(function (w) {
+          var r = byFile[w.id];
+          if (!r) return;
+          if (npDone(r, w)) {
+            npWaitDel(w.id);
+            if (!(!npDlg.hidden && np.file && np.file.id === w.id)) npToast(w.title || r[3] || '', r[11]);   // ダイアログで見ているときはダイアログに出す
+          }
+          else if (r[9] === 'Error' || r[9] === 'Drafted' || r[9] === 'Missed' || r[9] === 'Deleted') npWaitDel(w.id);
+        });
+        // 開いている「note に投稿」ダイアログの表示も新しくする
+        if (!npDlg.hidden && np.file && byFile[np.file.id]) npRenderRowState(byFile[np.file.id], npWaitGet(np.file.id) || null);
+        if (!lib.loaded) return 0;
+        rowsQ.forEach(function (r) {
           var fid = npFileIdOf(r && r[4]);
           if (!fid || r[8] === 'Disable') return;
           if (r[9] === 'Posted' || r[7] === '投稿済み') want[fid] = 'posted';
@@ -5128,7 +5156,89 @@ function greet(name) {
       });
     }).catch(function () { return 0; }).then(function (n) { npSyncing = false; return n; });
   }
-  setInterval(function () { if (!document.hidden) npSyncStatuses(); }, 5 * 60 * 1000);
+  // 画面を開いている間: 5分ごと。投稿を待っている記事があるときは1分ごと
+  var npTick = 0;
+  setInterval(function () {
+    npTick++;
+    if (document.hidden) return;
+    if (npWaitList().length || npTick % 5 === 0) npSyncStatuses();
+  }, 60 * 1000);
+  /* --- 投稿の完了表示: 「以下にnote記事を投稿しました。」＋ note の URL --- */
+  function npRowOf(rows, fid) { var hit = null; rows.forEach(function (r) { if (npFileIdOf(r && r[4]) === fid) hit = r; }); return hit; }
+  function npPostedText(url) { return '以下にnote記事を投稿しました。\n' + url; }
+  function npPostedNode(url) {
+    var box = document.createElement('div'); box.className = 'np-posted';
+    box.appendChild(document.createTextNode('以下にnote記事を投稿しました。'));
+    box.appendChild(document.createElement('br'));
+    var a = document.createElement('a'); a.className = 'np-url'; a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = url;
+    box.appendChild(a);
+    box.appendChild(document.createElement('br'));
+    var cp = document.createElement('button'); cp.type = 'button'; cp.className = 'np-copy'; cp.textContent = 'コピー';
+    cp.title = '「以下にnote記事を投稿しました。」と URL をコピーします';
+    cp.addEventListener('click', function () {
+      var t = npPostedText(url);
+      var ok = function () { cp.textContent = 'コピーしました'; setTimeout(function () { cp.textContent = 'コピー'; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, function () { npCopyFallback(t); ok(); });
+      else { npCopyFallback(t); ok(); }
+    });
+    box.appendChild(cp);
+    return box;
+  }
+  function npCopyFallback(t) {
+    var ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+    document.body.removeChild(ta);
+  }
+  // ダイアログ上の「この記事の予約」の表示。投稿が終わっていれば完了の文、待っていれば待ちの表示
+  function npRenderRowState(cur, waiting) {
+    var rs = document.getElementById('np-row-state');
+    rs.innerHTML = ''; rs.className = 'np-row-state';
+    if (npDone(cur, waiting && waiting.since !== undefined ? waiting : null)) {
+      rs.classList.add('done');
+      if (/閉じても大丈夫/.test(document.getElementById('np-state').textContent)) npSt('');
+      rs.appendChild(npPostedNode(cur[11]));
+      if (cur[10]) { var sm = document.createElement('div'); sm.className = 'muted'; sm.textContent = '投稿日時: ' + cur[10]; rs.appendChild(sm); }
+      rs.hidden = false;
+      return;
+    }
+    var parts = ['登録済み'];
+    if (cur[8] === 'Disable') parts.push('（停止中）');
+    if (cur[9]) parts.push('結果: ' + ({ Posted: '投稿済み', Scheduled: '予約済み', Drafted: '下書き保存済み', Error: 'エラー', Missed: '見送り', Deleted: '削除済み' }[cur[9]] || cur[9]));
+    if (cur[10]) parts.push('投稿: ' + cur[10]);
+    rs.textContent = parts.join('　');
+    if (cur[12]) { rs.appendChild(document.createElement('br')); rs.appendChild(document.createTextNode(cur[12])); }
+    if (waiting && cur[9] !== 'Error' && cur[9] !== 'Drafted' && cur[9] !== 'Missed') {
+      rs.classList.add('wait');
+      rs.appendChild(document.createElement('br'));
+      rs.appendChild(document.createTextNode(cur[7] === '予約投稿' && cur[1]
+        ? cur[1] + ' ' + cur[2] + ' に投稿します。投稿されたら、ここと画面の右下に note の URL を表示します'
+        : '投稿を待っています（投稿ツールは30分ごとに確認します）。投稿されたら、ここと画面の右下に note の URL を表示します'));
+    }
+    if (cur[11]) { rs.appendChild(document.createElement('br')); var a = document.createElement('a'); a.href = cur[11]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = cur[11]; rs.appendChild(a); }
+    rs.hidden = false;
+  }
+  // 投稿の完了を待っている記事（この端末で「予約に登録」したもの）。完了したら右下に知らせる
+  var NP_WAIT_KEY = 'md2pdf-note-wait';
+  function npWaitList() { try { var a = JSON.parse(localStorage.getItem(NP_WAIT_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function npWaitSet(a) { try { localStorage.setItem(NP_WAIT_KEY, JSON.stringify(a)); } catch (e) { /* ignore */ } }
+  function npWaitAdd(id, title, since) { var a = npWaitList().filter(function (w) { return w.id !== id; }); a.push({ id: id, title: title, since: since || '' }); npWaitSet(a); }
+  function npWaitGet(id) { return npWaitList().filter(function (w) { return w.id === id; })[0] || null; }
+  // 待っている記事の投稿が終わったか（上書きのときは、前の投稿日時から変わったら完了）
+  function npDone(r, w) { return r[9] === 'Posted' && !!r[11] && (!w || !w.since || String(r[10] || '') !== w.since); }
+  function npWaitDel(id) { npWaitSet(npWaitList().filter(function (w) { return w.id !== id; })); }
+  function npToast(title, url) {
+    var box = document.getElementById('np-toasts');
+    var t = document.createElement('div'); t.className = 'np-toast'; t.setAttribute('role', 'status');
+    var h = document.createElement('div'); h.className = 't'; h.textContent = title; h.title = title;
+    t.appendChild(h);
+    t.appendChild(npPostedNode(url));
+    var row = document.createElement('div'); row.className = 'row';
+    var x = document.createElement('button'); x.type = 'button'; x.textContent = '閉じる';
+    x.addEventListener('click', function () { box.removeChild(t); });
+    row.appendChild(x); t.appendChild(row);
+    box.appendChild(t);
+  }
   function npSyncWhen() { document.getElementById('np-when').hidden = document.getElementById('np-type').value !== '予約投稿'; }
   function openNotePost() {
     if (role !== 'master' || !driveCfg.noteQueue) return;
@@ -5182,16 +5292,7 @@ function greet(name) {
         }).catch(function () { /* 見つからなければ空のまま */ });
       }
       document.getElementById('np-tags').value = (tags || '').replace(/\n+$/, '');
-      if (np.row) {
-        var parts = ['登録済み'];
-        if (cur[8] === 'Disable') parts.push('（停止中）');
-        if (cur[9]) parts.push('結果: ' + ({ Posted: '投稿済み', Scheduled: '予約済み', Drafted: '下書き保存済み', Error: 'エラー', Missed: '見送り', Deleted: '削除済み' }[cur[9]] || cur[9]));
-        if (cur[10]) parts.push('投稿: ' + cur[10]);
-        rs.textContent = parts.join('　');
-        if (cur[12]) { rs.appendChild(document.createElement('br')); rs.appendChild(document.createTextNode(cur[12])); }
-        if (cur[11]) { rs.appendChild(document.createElement('br')); var a = document.createElement('a'); a.href = cur[11]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = cur[11]; rs.appendChild(a); }
-        rs.hidden = false;
-      }
+      if (np.row) npRenderRowState(cur, npWaitGet(np.file.id));
       document.getElementById('np-go').textContent = np.row ? '予約を更新' : '予約に登録';
       if (!accts.length) { npSt('note アカウントがありません（「設定」の記事のフォルダの下で追加してください）'); return; }
       npSyncWhen();
@@ -5255,7 +5356,14 @@ function greet(name) {
       }
       var what = type === '予約投稿' ? date.replace(/-/g, '/') + ' ' + time + ' に予約投稿' : type === '通常投稿' ? '次の確認のタイミングで投稿' : type === '下書き保存' ? '下書き保存' : '投稿済みの記事を上書き';
       setStatus('note の予約に' + (np.row ? '更新' : '登録') + 'しました: ' + title + '（' + what + '）' + (warn.length ? '　' + warn.join(' / ') : ''));
-      closeNotePost();
+      // 投稿（下書き保存以外）は完了を待つ。ダイアログは開いたままにし、完了したら note の URL を表示する（閉じても右下に知らせる）
+      np.row = np.row || 1;
+      document.getElementById('np-go').textContent = '予約を更新';
+      var prev = (np.rows && npRowOf(np.rows, file.id)) || [];
+      var since = prev[9] === 'Posted' ? String(prev[10] || '') : '';
+      if (type !== '下書き保存') npWaitAdd(file.id, title, since || ' '); else npWaitDel(file.id);
+      npRenderRowState(input.concat(['', '', '', '', '']), type !== '下書き保存' ? npWaitGet(file.id) : null);
+      npSt(type === '下書き保存' ? '下書き保存の予約に登録しました' : '予約に登録しました。この画面は閉じても大丈夫です');
     }).catch(function (e) { npSt('登録できませんでした: ' + ((e && e.message) || e)); }).then(function () { go.disabled = false; });
   }
   // 共有（通知メールは送らない。すでに共有済みでもエラーにしない）
