@@ -262,6 +262,7 @@
   #lib-list li .st-sel[data-st="draft"] { color: #b45309; border-color: #f59e0b; }
   #lib-list li .st-sel[data-st="review"] { color: #7c3aed; border-color: #a78bfa; }
   #lib-list li .st-sel[data-st="ready"] { color: #1d4ed8; border-color: #60a5fa; }
+  #lib-list li .st-sel[data-st="scheduled"] { color: #0e7490; border-color: #22d3ee; background: rgba(34, 211, 238, .10); }
   #lib-list li .st-sel[data-st="posted"] { color: #15803d; border-color: #22c55e; background: rgba(34, 197, 94, .12); }
   #lib-list li .meta a { color: var(--accent); text-decoration: none; margin-left: 6px; }
   #lib-list li.dirty .fn::after { content: ' ●'; color: #d97706; }
@@ -2620,7 +2621,7 @@ function greet(name) {
   var libVerListEl = document.getElementById('lib-ver-list');
   var libFilterEl = document.getElementById('lib-filter');
   var libStFilterEl = document.getElementById('lib-st-filter');
-  var FILE_STATUSES = [['', '未設定'], ['draft', '執筆中'], ['review', '確認中'], ['ready', '投稿待ち'], ['posted', '投稿済み']];
+  var FILE_STATUSES = [['', '未設定'], ['draft', '執筆中'], ['review', '確認中'], ['ready', '投稿待ち'], ['scheduled', '予約済み'], ['posted', '投稿済み']];
   // ステータスの絞り込み（記事の数つき。選んだものはこの端末に覚える）
   function groupStatus(g) { return g.newest.status || (g.files.filter(function (x) { return x.status; })[0] || {}).status || ''; }
   function libStMatch(st, sf) { return sf === 'none' ? !st : sf === 'notposted' ? st !== 'posted' : st === sf; }
@@ -5118,7 +5119,7 @@ function greet(name) {
     }, Promise.resolve('')).then(function (id) { return id ? npFileUrl(id) : ''; });
   }
   // note の投稿結果（予約キューの Result）を一覧のステータスに反映する
-  //   Posted（投稿済み）→「投稿済み」、Scheduled（予約済み）→「投稿待ち」（すでに投稿待ち・投稿済みなら変えない）
+  //   Posted（投稿済み）→「投稿済み」、Scheduled（note で予約済み）→「予約済み」（投稿済みは戻さない）
   // 一覧を読み込んだとき・5分ごと（画面を開いている間）に確かめる。クライアントは行わない
   var npSyncing = false;
   function npSyncStatuses() {
@@ -5149,12 +5150,12 @@ function greet(name) {
           var fid = npFileIdOf(r && r[4]);
           if (!fid || r[8] === 'Disable') return;
           if (r[9] === 'Posted' || r[7] === '投稿済み') want[fid] = 'posted';
-          else if (r[9] === 'Scheduled' && want[fid] !== 'posted') want[fid] = 'ready';
+          else if (r[9] === 'Scheduled' && want[fid] !== 'posted') want[fid] = 'scheduled';
         });
         var jobs = [];
         lib.files.forEach(function (f) {
           var st = want[f.id];
-          if (!st || f.status === st || f.status === 'posted' || (st === 'ready' && f.status === 'ready')) return;
+          if (!st || f.status === st || f.status === 'posted') return;
           jobs.push(driveSetStatus(f.id, st).then(function () {
             f.status = st;
             if (lib.current && lib.current.id === f.id) lib.current.status = st;
@@ -5176,9 +5177,31 @@ function greet(name) {
     npTick++;
     if (document.hidden) return;
     var w = npWaitList();
-    var fast = w.some(function (x) { return x.kick && Date.now() - x.kick < 15 * 60 * 1000; });
+    npKickDue(w);
+    var now = Date.now();
+    var fast = w.some(function (x) { return (x.kick && now - x.kick < 15 * 60 * 1000) || (x.at && now > x.at - NP_KICK_BEFORE - 60 * 1000 && now < x.at + 20 * 60 * 1000); });
     if (fast || (w.length && npTick % 4 === 0) || npTick % 20 === 0) npSyncStatuses();
   }, 15 * 1000);
+  // 予約投稿: 予約時刻の少し前（投稿ツールが先読みして時刻まで待てる範囲）に、投稿ツールを起動する
+  //   GitHub の定期実行は遅れたり飛ばされたりするため。md2pdf を開いている間（閉じていたら次に開いたとき）に行う
+  var NP_KICK_BEFORE = 8 * 60 * 1000;   // 投稿ツールの先読みは10分
+  var npKicking = false;
+  function npKickDue(list) {
+    if (npKicking || !driveCfg.noteQueue || role !== 'master') return;
+    var now = Date.now();
+    var due = (list || npWaitList()).filter(function (x) { return x.at && !x.atKicked && now >= x.at - NP_KICK_BEFORE && now < x.at + 2 * 60 * 60 * 1000; });
+    if (!due.length) return;
+    npKicking = true;
+    privLoad().catch(function () { return null; }).then(function () {
+      if (!ghToken()) return;
+      return ghDispatch('run').then(function () {
+        var a = npWaitList().map(function (x) { if (due.some(function (d) { return d.id === x.id; })) { x.atKicked = Date.now(); x.kick = Date.now(); } return x; });
+        npWaitSet(a);
+        setStatus('予約時刻が近いため、投稿ツールを起動しました（' + due.map(function (d) { return d.title; }).join('、') + '）');
+        if (!npDlg.hidden && np.file && due.some(function (d) { return d.id === np.file.id; })) npSyncStatuses();
+      });
+    }).catch(function () { /* 次の確認でもう一度 */ }).then(function () { npKicking = false; });
+  }
   /* --- 投稿ツール（GitHub Actions）をすぐ起動する: マスターの端末にだけ GitHub トークンを置く --- */
   // トークンは Google アカウントごとに保存する: その人のマイドライブ直下の個人設定ファイル（共有しない）
   var GH_KEY = 'md2pdf-gh-token';   // 以前（端末ごと）の保存場所。見つけたらアカウントへ移す
@@ -5321,7 +5344,7 @@ function greet(name) {
       rs.appendChild(document.createElement('br'));
       var kicked = waiting.kick && Date.now() - waiting.kick < 15 * 60 * 1000;
       rs.appendChild(document.createTextNode(cur[7] === '予約投稿' && cur[1]
-        ? cur[1] + ' ' + cur[2] + ' に投稿します。投稿されたら、ここと画面の右下に note の URL を表示します'
+        ? cur[1] + ' ' + cur[2] + ' に投稿します。' + (kicked ? '投稿ツールを起動しました（時刻まで待って公開します）。' : ghToken() ? '時刻の8分前に投稿ツールを起動します（md2pdf を開いている間）。' : '') + '投稿されたら、ここと画面の右下に note の URL を表示します'
         : kicked ? '投稿ツールを起動しました。1〜3分ほどで投稿します。投稿されたら、ここと画面の右下に note の URL を表示します'
         : '投稿を待っています（次の定期確認で投稿します）。投稿されたら、ここと画面の右下に note の URL を表示します'));
     }
@@ -5333,7 +5356,7 @@ function greet(name) {
   var NP_WAIT_KEY = 'md2pdf-note-wait';
   function npWaitList() { try { var a = JSON.parse(localStorage.getItem(NP_WAIT_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
   function npWaitSet(a) { try { localStorage.setItem(NP_WAIT_KEY, JSON.stringify(a)); } catch (e) { /* ignore */ } }
-  function npWaitAdd(id, title, since, kick) { var a = npWaitList().filter(function (w) { return w.id !== id; }); a.push({ id: id, title: title, since: since || '', kick: kick || 0 }); npWaitSet(a); }
+  function npWaitAdd(id, title, since, kick, at) { var a = npWaitList().filter(function (w) { return w.id !== id; }); a.push({ id: id, title: title, since: since || '', kick: kick || 0, at: at || 0, atKicked: at && kick ? kick : 0 }); npWaitSet(a); }
   function npWaitGet(id) { return npWaitList().filter(function (w) { return w.id === id; })[0] || null; }
   // 待っている記事の投稿が終わったか（上書きのときは、前の投稿日時から変わったら完了）
   function npDone(r, w) { return r[9] === 'Posted' && !!r[11] && (!w || !w.since || String(r[10] || '') !== w.since); }
@@ -5462,6 +5485,7 @@ function greet(name) {
       document.getElementById('np-thumb').value.trim(), tags, type, 'Enable'];
     var warn = [];
     var kicked = 0;
+    var atMs = type === '予約投稿' ? new Date(date + 'T' + time + ':00').getTime() : 0;
     // 1. 変更があれば先に保存（投稿ツールは Drive のファイルを読む）
     // 本文の公開日・最終更新日（下書き保存のときは変えない）
     if (type !== '下書き保存' && lib.current && lib.current.id === file.id) {
@@ -5504,22 +5528,28 @@ function greet(name) {
           queueId ? driveShareQuiet(queueId, driveCfg.noteServiceAccount, 'writer').catch(function (e) { warn.push('予約キューの共有に失敗: ' + ((e && e.message) || e)); }) : null
         ]);
       }).then(function () {
-        // 4. すぐに投稿・下書き保存・上書きは、投稿ツールをすぐ起動する（予約投稿は定期確認で予約する）
-        if (type === '予約投稿') return;
+        // 4. すぐに投稿・下書き保存・上書きは、投稿ツールをすぐ起動する
+        //    予約投稿は、予約時刻が近ければ（8分以内・過ぎている）すぐ起動、先なら時刻の8分前に起動する
+        if (type === '予約投稿' && atMs - Date.now() > NP_KICK_BEFORE) {
+          return privLoad().catch(function () { return null; }).then(function () {
+            if (!ghToken()) warn.push('GitHub トークンが未登録のため、定期確認（毎時55分）で投稿します。時刻どおりに出すには「設定」で登録してください');
+          });
+        }
         return privLoad().catch(function () { return null; }).then(function () {
         if (!ghToken()) { warn.push('GitHub トークンが未登録のため、次の定期確認（30分ごと）で投稿します。「設定」で登録するとすぐに投稿します'); return; }
         npSt('投稿ツールを起動中...');
-        return ghDispatch(type === '上書き保存' ? 'run' : 'instant').then(function () { kicked = Date.now(); })
+        return ghDispatch(type === '上書き保存' || type === '予約投稿' ? 'run' : 'instant').then(function () { kicked = Date.now(); })
           .catch(function (e) { warn.push('投稿ツールを起動できませんでした（' + ((e && e.message) || e) + '）。次の定期確認で投稿します'); });
         });
       });
     }).then(function () {
       try { localStorage.setItem('md2pdf-note-acct', acct); } catch (e) { /* ignore */ }
-      // 4. 記事のステータスを「投稿待ち」に（下書き保存のときは変えない）
-      if (type !== '下書き保存' && file.status !== 'posted') {
-        driveSetStatus(file.id, 'ready').then(function () {
-          lib.files.forEach(function (f) { if (f.id === file.id) f.status = 'ready'; });
-          if (lib.current && lib.current.id === file.id) lib.current.status = 'ready';
+      // 4. 記事のステータス: 予約投稿は「予約済み」、すぐに投稿は「投稿待ち」（下書き保存・投稿済みは変えない）
+      var newSt = type === '予約投稿' ? 'scheduled' : 'ready';
+      if (type !== '下書き保存' && file.status !== 'posted' && file.status !== newSt) {
+        driveSetStatus(file.id, newSt).then(function () {
+          lib.files.forEach(function (f) { if (f.id === file.id) f.status = newSt; });
+          if (lib.current && lib.current.id === file.id) lib.current.status = newSt;
           libRenderList();
         }).catch(function () { /* ignore */ });
       }
@@ -5530,7 +5560,7 @@ function greet(name) {
       document.getElementById('np-go').textContent = '予約を更新';
       var prev = (np.rows && npRowOf(np.rows, file.id)) || [];
       var since = prev[9] === 'Posted' ? String(prev[10] || '') : '';
-      if (type !== '下書き保存') npWaitAdd(file.id, title, since || ' ', kicked); else npWaitDel(file.id);
+      if (type !== '下書き保存') npWaitAdd(file.id, title, since || ' ', kicked, atMs); else npWaitDel(file.id);
       npRenderRowState(input.concat(['', '', '', '', '']), type !== '下書き保存' ? npWaitGet(file.id) : null);
       npSt(warn.length ? warn.join(' / ') : type === '下書き保存' ? (kicked ? '下書き保存を始めました' : '下書き保存の予約に登録しました') : '予約に登録しました。この画面は閉じても大丈夫です');
     }).catch(function (e) { npSt('登録できませんでした: ' + ((e && e.message) || e)); }).then(function () { go.disabled = false; });
