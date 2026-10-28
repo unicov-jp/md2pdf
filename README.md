@@ -114,6 +114,7 @@ flowchart LR
 
 | 版 | 内容 | 目印（GitHub のブランチ） |
 | --- | --- | --- |
+| 第6版 v6.13（2026-10-29） | JSON（名簿・予約キュー・個人設定）を非公開の保存先フォルダへ集約。名簿はファイルだけを閲覧共有 | release/v6.13 |
 | 第6版 v6.12（2026-10-28） | 一覧の投稿済みの記事に「note」ボタン（note の記事へジャンプ） | release/v6.12 |
 | 第6版 v6.11（2026-10-28） | ステータスに「予約済み」を追加（予約投稿をセット→予約済み、投稿完了→投稿済み）。予約投稿は時刻の8分前に投稿ツールを起動して時刻どおりに公開 | release/v6.11 |
 | 第6版 v6.10（2026-10-28） | GitHub トークンを Google アカウントごとに保存（マイドライブの個人設定ファイル）。どの端末でも使える | release/v6.10 |
@@ -131,7 +132,7 @@ flowchart LR
 | 第4版 v4 | 画面で編集 | release/v4 |
 | 第3版 v3 | Google Drive ポータル | release/v3 |
 
-- 第6版以降はサイトの中にも控えがあります: https://unicov-jp.github.io/md2pdf/versions/v6.12/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.11/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.10/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.9/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.8/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.7/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.6/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.5/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.4/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.3/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.2/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.1/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.0/ （そのまま開いて使えます）
+- 第6版以降はサイトの中にも控えがあります: https://unicov-jp.github.io/md2pdf/versions/v6.13/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.12/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.11/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.10/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.9/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.8/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.7/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.6/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.5/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.4/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.3/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.2/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.1/ 、 https://unicov-jp.github.io/md2pdf/versions/v6.0/ （そのまま開いて使えます）
 - 公開版をある版に戻すには、その版の `index.html` と `md2pdf-config.json` を最上位に上書きして main に反映します。
   例: `git checkout release/v6.0 -- index.html md2pdf-config.json && git commit -m "v6.0 に戻す" && git push origin main`
 - 新しい版を出すときは、`versions/vX.Y/` に控えを作り、`release/vX.Y` のブランチを作ってこの表に1行足します。
@@ -155,3 +156,12 @@ flowchart LR
 - 予約投稿の起動: GitHub の定期実行は遅れたり飛ばされたりするため、予約時刻の8分前に md2pdf が投稿ツールを mode=run で起動します（投稿ツールは10分先まで先読みし、時刻まで待って公開）。予約時刻が8分以内・過ぎている（2時間以内）ときは登録と同時に起動。md2pdf を開いている間に行い、閉じていた場合は次に開いたとき（予約から2時間以内）か、定期確認で公開します。
 - 一覧の「note」ボタン: 投稿済みの記事は、ステータスの左の「note」ボタンを押すと note の記事を新しいタブで開きます（投稿済み以外はグレーで押せません）（URL はファイルの appProperties md2pdfNoteUrl に記録。クライアントにも出ます）。
 - 投稿方法: 予約投稿（日時指定）／通常投稿（次の確認で公開）／下書き保存／投稿済みの記事を上書き。下書き保存以外は記事のステータスを「投稿待ち」にします。
+
+## データ（JSON）の保存先（第6版 v6.13）
+
+- 保存先フォルダ: マスターのマイドライブの「🔒Markdown to PDF（md2pdf.json）」 https://drive.google.com/drive/folders/1Qa-IXFy_WJZLbIfyTDOSPihdGqgsUOeB （md2pdf-config.json の folderId）。フォルダ自体は誰とも共有しない。
+  - md2pdf-team.json（名簿）: マスター以外のユーザー・クライアントに、このファイルだけを閲覧で共有（「設定」の保存のたびに確認・通知メールなし）。
+  - md2pdf-note.json（note 予約キュー）: 投稿ツールのサービスアカウントだけに編集で共有。投稿ツールはファイル ID（ワークフローの MD2PDF_QUEUE_FILE_ID）で開く。
+  - md2pdf-個人設定_<メールアドレス>.json（GitHub トークン）: 共有しない。以前のマイドライブ直下のファイルは自動でここへ移してゴミ箱へ。
+- md2pdf-config.json だけは GitHub（このリポジトリ）に置く（サイトが最初に読む設定のため）。
+- note 投稿結果の一覧への反映はマスターの画面だけで行う（ほかの人は予約キューを読めないため）。

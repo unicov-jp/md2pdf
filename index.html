@@ -1971,6 +1971,17 @@ function greet(name) {
       .then(function (r) { return r.json(); })
       .then(function (j) { return (j.files && j.files[0]) ? j.files[0].id : ''; });
   }
+  // フォルダの中が見えない（ファイルだけ共有されている）ときに、名前で探す。そのフォルダのものを優先
+  function driveFindNamed(name, folderId) {
+    var q = "name = '" + name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "' and trashed = false";
+    return driveFetch('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=files(id,name,parents)&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives&pageSize=20')
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var fs = (j && j.files) || [];
+        var hit = fs.filter(function (f) { return (f.parents || []).indexOf(folderId) >= 0; })[0] || (fs.length === 1 ? fs[0] : null);
+        return hit ? hit.id : '';
+      }).catch(function () { return ''; });
+  }
   // 同じフォルダに同じ名前があれば上書き、無ければ新規
   function driveUpload(name, blob, mimeType, folderId) {
     return driveFindInFolder(name, folderId).then(function (existing) {
@@ -3978,7 +3989,7 @@ function greet(name) {
   function teamLoad() {
     team.loaded = false;
     if (!driveCfg.folderId) return Promise.reject(new Error('ルートフォルダが未設定です（md2pdf-config.json の folderId）'));
-    return driveFindInFolder(TEAM_FILE, driveCfg.folderId).then(function (id) {
+    return driveFindInFolder(TEAM_FILE, driveCfg.folderId).then(function (id) { return id || driveFindNamed(TEAM_FILE, driveCfg.folderId); }).then(function (id) {
       if (!id) { team.users = []; team.drives = []; team.fileId = ''; team.loaded = true; return; }
       team.fileId = id;
       return driveDownload(id).then(function (b) { return b.text(); }).then(function (t) {
@@ -4569,11 +4580,33 @@ function greet(name) {
     document.getElementById(k).addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tm-drive-url-add').click(); } });
   });
   // 共有の「あるべき状態」: ユーザー＝ルート閲覧＋全ドライブ編集、クライアント＝ルート閲覧＋担当ドライブ編集（マスターは自分で管理）
+  function teamShareRoster() {
+    if (!team.fileId) return Promise.resolve();
+    var want = {};
+    team.users.forEach(function (u) { if (u.role !== 'master' && teamMasters.indexOf(u.email) < 0) want[lowerMail(u.email)] = 1; });
+    return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(team.fileId) + '/permissions?supportsAllDrives=true&fields=permissions(id,emailAddress,role)&pageSize=100')
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var have = {}, drop = [];
+        (j.permissions || []).forEach(function (x) {
+          var m = lowerMail(x.emailAddress);
+          if (!m) return;
+          have[m] = 1;
+          if (x.role === 'reader' && !want[m]) drop.push(x.id);   // 名簿から外れた人の閲覧を外す
+        });
+        var add = Object.keys(want).filter(function (m) { return !have[m]; });
+        return add.reduce(function (q, m) { return q.then(function () { return driveShareQuiet(team.fileId, m, 'reader'); }); }, Promise.resolve())
+          .then(function () {
+            return drop.reduce(function (q, id) {
+              return q.then(function () { return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(team.fileId) + '/permissions/' + encodeURIComponent(id) + '?supportsAllDrives=true', { method: 'DELETE' }); });
+            }, Promise.resolve());
+          });
+      });
+  }
   function teamDesired(users, drives) {
     var out = {};
     users.forEach(function (u) {
       if (u.role === 'master') return;
-      if (driveCfg.folderId) out[driveCfg.folderId + '|' + u.email] = { file: driveCfg.folderId, email: u.email, role: 'reader', what: u.email + ' にルートを共有' };
       var ids = u.role === 'client' ? (u.drives || []) : drives.map(function (d) { return d.id; });
       drives.forEach(function (d) {
         if (ids.indexOf(d.id) < 0) return;
@@ -4612,6 +4645,8 @@ function greet(name) {
         var p = before[k];
         jobs.push({ what: p.what.replace(/を共有$/, 'の共有を解除'), run: function () { return driveUnshare(p.file, p.email); } });
       });
+      // 名簿のファイル（md2pdf-team.json）だけを、マスター以外の全員に閲覧で共有する（保存先フォルダは共有しない）
+      jobs.push({ what: '名簿の共有を確認', run: teamShareRoster });
     }
     btn.disabled = true;
     st.textContent = '名簿を保存中...';
@@ -5152,7 +5187,7 @@ function greet(name) {
   // 一覧を読み込んだとき・5分ごと（画面を開いている間）に確かめる。クライアントは行わない
   var npSyncing = false;
   function npSyncStatuses() {
-    if (npSyncing || !driveCfg.noteQueue || !driveCfg.folderId || role === 'client' || !libConnectedNow()) return Promise.resolve(0);
+    if (npSyncing || !driveCfg.noteQueue || !driveCfg.folderId || role !== 'master' || !libConnectedNow()) return Promise.resolve(0);
     npSyncing = true;
     return driveFindInFolder(NOTE_QUEUE_FILE, driveCfg.folderId).then(function (id) {
       if (!id) return 0;
@@ -5240,14 +5275,20 @@ function greet(name) {
   /* --- 投稿ツール（GitHub Actions）をすぐ起動する: マスターの端末にだけ GitHub トークンを置く --- */
   // トークンは Google アカウントごとに保存する: その人のマイドライブ直下の個人設定ファイル（共有しない）
   var GH_KEY = 'md2pdf-gh-token';   // 以前（端末ごと）の保存場所。見つけたらアカウントへ移す
-  var PRIV_FILE = 'md2pdf-個人設定（共有しないでください）.json';
+  var PRIV_FILE = 'md2pdf-個人設定（共有しないでください）.json';   // 以前の保存場所（マイドライブ直下）
+  function privName(who) { return 'md2pdf-個人設定_' + who + '.json'; }   // 今の保存場所: 保存先フォルダ（アカウントごと）
   var priv = { who: '', data: null, id: '' };
   function privWho() { return (lib.user && lowerMail(lib.user.emailAddress)) || ''; }
   function privLoad() {
     var who = privWho();
     if (!who || !libConnectedNow()) return Promise.resolve(null);
     if (priv.who === who && priv.data) return Promise.resolve(priv.data);
-    return driveFindInFolder(PRIV_FILE, 'root').then(function (id) {
+    var legacy = '';
+    return driveFindInFolder(privName(who), driveCfg.folderId).then(function (id) {
+      if (id) return id;
+      // 以前の保存場所（マイドライブ直下）にあれば読み、あとで保存先フォルダへ移す
+      return driveFindInFolder(PRIV_FILE, 'root').then(function (old) { legacy = old || ''; return old; });
+    }).then(function (id) {
       if (!id) return {};
       return driveDownload(id).then(function (b) { return b.text(); }).then(function (t) {
         priv.id = id;
@@ -5255,6 +5296,11 @@ function greet(name) {
       });
     }).then(function (data) {
       priv = { who: who, data: data, id: priv.id };
+      if (legacy && data.ghToken) {
+        return privSave({}).then(function () {
+          return driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(legacy) + '?supportsAllDrives=true', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) }).catch(function () { /* ignore */ });
+        }).then(function () { return priv.data; }, function () { return priv.data; });
+      }
       // 以前この端末に保存したトークンがあれば、アカウントの保存場所へ移す
       var old = '';
       try { old = localStorage.getItem(GH_KEY) || ''; } catch (e) { /* ignore */ }
@@ -5269,7 +5315,7 @@ function greet(name) {
     Object.keys((priv.who === who && priv.data) || {}).forEach(function (k) { data[k] = priv.data[k]; });
     Object.keys(patch).forEach(function (k) { if (patch[k] === '' || patch[k] === null) delete data[k]; else data[k] = patch[k]; });
     data.account = who; data.updatedAt = new Date().toISOString();
-    return driveUpload(PRIV_FILE, new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json' }), 'application/json', 'root')
+    return driveUpload(privName(who), new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json' }), 'application/json', driveCfg.folderId)
       .then(function (j) { priv = { who: who, data: data, id: (j && j.id) || priv.id }; return data; });
   }
   function ghToken() { return (priv.who && priv.who === privWho() && priv.data && priv.data.ghToken) || ''; }
